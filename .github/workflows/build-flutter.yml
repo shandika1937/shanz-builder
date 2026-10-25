@@ -35,10 +35,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Flutter 3.29.0
+      - name: Setup Flutter 3.32.8 (Dart 3.8.1 SDK)
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.29.0'
+          flutter-version: '3.32.8'
           channel: 'stable'
           cache: true
 
@@ -67,6 +67,12 @@ jobs:
               cp -a "$SUBDIR"/. .
               rm -rf "$SUBDIR"
             fi
+          fi
+
+          # Fix potential SDK constraint in pubspec.yaml if needed
+          if [ -f "pubspec.yaml" ]; then
+            sed -i 's/sdk: \^3\.8\.1/sdk: ">=3.7.0 <4.0.0"/g' pubspec.yaml
+            sed -i 's/sdk: \^3\.8\./sdk: ">=3.7.0 <4.0.0"/g' pubspec.yaml
           fi
 
           # Auto fix Gradle wrapper if exists
