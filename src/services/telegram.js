@@ -259,6 +259,16 @@ export class TelegramClient {
     }
   }
 
+  async sendPhoto(chatId, photoUrl, caption = '', extra = {}) {
+    return this.call('sendPhoto', {
+      chat_id: chatId,
+      photo: photoUrl,
+      caption,
+      parse_mode: 'HTML',
+      ...extra
+    });
+  }
+
   async sendMessage(chatId, text, extra = {}) {
     return this.call('sendMessage', {
       chat_id: chatId,
