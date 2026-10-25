@@ -121,8 +121,27 @@ async function processUpdate(update) {
 
 async function handleMessage(msg) {
   const chatId = msg.chat.id;
+  const chatType = msg.chat.type; // 'private', 'group', 'supergroup', 'channel'
   const userId = String(msg.from.id);
   const text = msg.text ? msg.text.trim() : '';
+
+  // Batasi bot hanya aktif di Private Message (PM)
+  if (chatType !== 'private') {
+    if (text.startsWith('/start') || text.startsWith('/help') || msg.document) {
+      return telegram.sendMessage(
+        chatId,
+        `⚠️ <b>Bot Ini Hanya Bisa Digunakan di Chat Pribadi (PM)!</b>\n\nSilakan klik tombol di bawah untuk membuka chat langsung dengan bot.`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '💬 Buka Bot di PM', url: 'https://t.me/ZIP2APKBOT?start=start' }]
+            ]
+          }
+        }
+      );
+    }
+    return;
+  }
 
   // Mode Publik: Semua pengguna Telegram dapat mengakses dan mengompilasi APK!
   // Owner & Co-Owner terdaftar untuk identitas dan hak admin.
@@ -181,9 +200,14 @@ async function handleMessage(msg) {
 
 async function handleCallbackQuery(query) {
   const chatId = query.message.chat.id;
+  const chatType = query.message.chat.type;
   const messageId = query.message.message_id;
   const userId = String(query.from.id);
   const data = query.data;
+
+  if (chatType !== 'private') {
+    return telegram.answerCallbackQuery(query.id, '⚠️ Fitur ini hanya dapat digunakan di PM (Private Chat).', true);
+  }
 
   await telegram.answerCallbackQuery(query.id);
 
