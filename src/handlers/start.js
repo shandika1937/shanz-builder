@@ -1,7 +1,5 @@
 import { createStartKeyboard } from '../services/telegram.js';
 
-import { createStartKeyboard } from '../services/telegram.js';
-
 export async function handleStart(telegram, chatId, user, creditsInfo = null) {
   const name = user?.first_name ? user.first_name.replace(/[<>&"']/g, '') : 'Developer';
 
