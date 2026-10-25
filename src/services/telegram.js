@@ -110,31 +110,42 @@ export function createStartKeyboard() {
     inline_keyboard: [
       [
         {
-          text: '📦 Build ZIP to APK',
+          text: '🚀 Mulai Build APK',
           callback_data: 'select_zip_engine',
           style: 'primary'
         },
         {
-          text: '🌐 Build HTML to APK',
+          text: '🌐 Web to APK',
           callback_data: 'select_html_engine',
           style: 'success'
         }
       ],
       [
         {
-          text: '📊 Status Worker VPS',
+          text: '⏳ Antrian Build',
           callback_data: 'check_workers',
           style: 'primary'
         },
         {
-          text: '💳 Sisa Credit',
-          callback_data: 'check_credits',
+          text: '📊 Status Bot',
+          callback_data: 'check_status_bot',
           style: 'success'
         }
       ],
       [
         {
-          text: '📢 Grup Informasi & Log Build',
+          text: '📖 Panduan',
+          callback_data: 'panduan_bot',
+          style: 'primary'
+        },
+        {
+          text: '🐛 Laporkan Bug',
+          url: 'https://t.me/ShanzRL'
+        }
+      ],
+      [
+        {
+          text: '📢 Channel Info',
           url: 'https://t.me/infobotbuildzip'
         }
       ]

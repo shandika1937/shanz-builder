@@ -308,7 +308,8 @@ async function handleMessage(msg) {
   if (text.startsWith('/start') || text.startsWith('/help')) {
     userSessions.set(userId, { mode: 'idle' });
     const userCredits = creditManager.getCredits(userId);
-    return handleStart(telegram, chatId, msg.from, userCredits);
+    const totalUsers = creditManager.getTotalUsers() || 1;
+    return handleStart(telegram, chatId, msg.from, userCredits, totalUsers);
   }
 
   // Handle Bottom Keyboard (Rich Menu) actions
@@ -396,6 +397,30 @@ async function handleCallbackQuery(query) {
 
   if (data === 'select_html_engine') {
     return sendEngineSelection(chatId, 'html');
+  }
+
+  if (data === 'check_status_bot') {
+    return sendWorkersStatus(chatId);
+  }
+
+  if (data === 'panduan_bot') {
+    const text = 
+      `📖 <b>PANDUAN PENGGUNAAN BOT</b>\n\n` +
+      `1. <b>Build APK Flutter:</b>\n` +
+      `• Siapkan file <code>.zip</code> proyek Flutter kamu.\n` +
+      `• Pastikan di dalam ZIP terdapat <code>pubspec.yaml</code> dan folder <code>lib/</code>.\n` +
+      `• Klik tombol <b>🚀 Mulai Build APK</b> lalu kirimkan file ZIP kamu.\n\n` +
+      `2. <b>Web to APK (HTML):</b>\n` +
+      `• Siapkan file <code>.html</code> website kamu.\n` +
+      `• Klik tombol <b>🌐 Web to APK</b> dan kirimkan file HTML kamu.\n\n` +
+      `3. <b>Pilihan Jalur:</b>\n` +
+      `• <b>VPS Worker:</b> Kompilasi dedicated 16GB RAM tercepat.\n` +
+      `• <b>GitHub Actions:</b> Kompilasi cloud runner resmi.\n\n` +
+      `<i>Hubungi Owner @ShanzRL jika mengalami kendala.</i>`;
+    return telegram.sendMessage(chatId, text, {
+      parse_mode: 'HTML',
+      reply_markup: createStartKeyboard()
+    });
   }
 
   if (data === 'check_workers') {

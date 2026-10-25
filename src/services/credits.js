@@ -28,6 +28,10 @@ export class CreditManager {
     fs.writeFileSync(this.storagePath, JSON.stringify(this.data, null, 2));
   }
 
+  getTotalUsers() {
+    return Object.keys(this.data).length;
+  }
+
   isAdmin(userId) {
     return this.adminIds.has(String(userId));
   }

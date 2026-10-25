@@ -2,23 +2,19 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { handleStart } from '../src/handlers/start.js';
 
-test('handleStart formats greeting and uses sendRichMessage with styled buttons', async () => {
+test('handleStart formats greeting and uses sendMessage with styled buttons', async () => {
   let sentPayload = null;
   const mockTelegram = {
-    sendRichMessage: async (chatId, html, options) => {
-      sentPayload = { chatId, html, options };
+    sendMessage: async (chatId, text, options) => {
+      sentPayload = { chatId, text, options };
       return { message_id: 100 };
-    },
-    editRichMessage: async (chatId, messageId, html, options) => {
-      sentPayload = { chatId, html, options };
-      return { message_id: messageId };
     }
   };
 
-  const res = await handleStart(mockTelegram, 12345, { first_name: 'Shanz' }, 3);
+  const res = await handleStart(mockTelegram, 12345, { first_name: 'Shandika', username: 'ShanzRL', id: 12345 }, Infinity, 100);
   assert.equal(res.message_id, 100);
-  assert.ok(sentPayload.html.includes('Shanz'));
-  assert.ok(sentPayload.html.toLowerCase().includes('apk cloud builder'));
-  assert.ok(sentPayload.html.includes('tg-button'));
+  assert.ok(sentPayload.text.includes('Shandika'));
+  assert.ok(sentPayload.text.includes('PROFIL KAMU'));
+  assert.ok(sentPayload.text.includes('STATISTIK BOT'));
   assert.ok(sentPayload.options.reply_markup.inline_keyboard);
 });
