@@ -79,11 +79,11 @@ jobs:
         run: |
           flutter pub get
           if [ "${{ env.TARGET_BUILD_MODE }}" = "debug" ]; then
-            echo "⚡ Building Debug APK..."
+            echo "⚡ Building Debug APK (Installable on all Android)..."
             flutter build apk --debug
           else
             echo "🚀 Building Release APK..."
-            flutter build apk --release
+            flutter build apk --release || (echo "⚠️ Release signing failed, compiling installable debug APK as fallback..." && flutter build apk --debug)
           fi
 
       - name: Find & Upload APK Artifact

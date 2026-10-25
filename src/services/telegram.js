@@ -38,13 +38,13 @@ export async function downloadLargeFile(apiId, apiHash, botToken, sessionStr, ch
   onProgress(1, totalBytes, 1);
 
   const downloadOpts = {
-    workers: 4,
+    workers: 8,
     progressCallback: (downloaded, total) => {
       const now = Date.now();
       const d = Number(downloaded);
       const t = Number(total);
       const percent = t > 0 ? Math.floor((d / t) * 100) : 0;
-      if ((percent - lastPercent >= 3 && now - lastTime >= 1200) || percent === 100) {
+      if ((percent - lastPercent >= 2 && now - lastTime >= 1000) || percent === 100) {
         lastPercent = percent;
         lastTime = now;
         onProgress(d, t, percent);
