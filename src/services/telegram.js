@@ -64,21 +64,19 @@ export function createEngineSelectionKeyboard(fileType) {
     inline_keyboard: [
       [
         {
-          text: '🖥️ Kompilasi via VPS Worker (Cepat & Dedicated)',
+          text: '🖥️ VPS Worker (16GB RAM)',
           callback_data: `engine_vps_${fileType}`,
           style: 'primary'
-        }
-      ],
-      [
+        },
         {
-          text: '☁️ Kompilasi via GitHub Actions (Cloud Runner)',
+          text: '☁️ GitHub Cloud',
           callback_data: `engine_github_${fileType}`,
           style: 'success'
         }
       ],
       [
         {
-          text: '📊 Cek Status Worker VPS',
+          text: '📊 Status Worker',
           callback_data: 'check_workers',
           style: 'primary'
         }

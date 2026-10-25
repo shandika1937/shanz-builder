@@ -119,21 +119,13 @@ console.log(`🤝 Co-Owner: ${config.coOwnerId} (@gamersbug)`);
 
 async function sendCreditsInfo(chatId, userId) {
   const credits = creditManager.getCredits(userId);
-  const statusStr = credits === Infinity ? '♾️ Unlimited (Akses Owner/Admin)' : `${credits} Kali Build Tersisa`;
+  const statusStr = credits === Infinity ? '♾️ Unlimited' : `${credits} Credit`;
   const html = 
-    `<h1>💳 Informasi Kuota Credit</h1>` +
-    `<p>Status akun kamu saat ini:</p>` +
-    `<table bordered compact striped>` +
-    `<tr><th>Pengguna</th><th>Sisa Kuota</th></tr>` +
-    `<tr><td>ID: <code>${userId}</code></td><td><b>${statusStr}</b></td></tr>` +
-    `</table>` +
-    `<details open><summary><b>Ketentuan Kuota:</b></summary>` +
-    `<p>• Setiap pengguna baru otomatis mendapatkan <b>3 Credit Gratis</b>.</p>` +
-    `<p>• 1 Credit digunakan setiap kali berhasil melakukan kompilasi APK.</p>` +
-    `<p>• Hubungi Owner atau Co-Owner jika ingin menambah kuota.</p>` +
-    `</details>` +
+    `<h1>💳 Kuota Credit</h1>` +
+    `<p>ID: <code>${userId}</code> • Sisa: <b>${statusStr}</b></p>` +
+    `<p><i>Tiap kompilasi sukses memakai 1 credit.</i></p>` +
     `<tg-button-row>` +
-    `<tg-button type="url" style="primary" url="https://t.me/ShanzRL">💬 Hubungi Owner</tg-button>` +
+    `<tg-button type="url" style="primary" url="https://t.me/ShanzRL">💬 Top Up / Hubungi Owner</tg-button>` +
     `</tg-button-row>`;
   return telegram.sendRichMessage(chatId, html, { reply_markup: createStartKeyboard() });
 }
@@ -141,39 +133,25 @@ async function sendCreditsInfo(chatId, userId) {
 async function sendWorkersStatus(chatId) {
   const vpsInfo = await vps.getStatus();
   const vpsStatusText = vpsInfo.status === 'online' ? '🟢 Online' : '🔴 Offline';
-  const vpsActivity = vpsInfo.isBuilding ? `⚙️ Sedang Mengompilasi (${vpsInfo.currentBuild?.appName || 'App'})` : '💤 Idle (Siap Menerima Build)';
 
   const html = 
-    `<h1>📊 Status Infrastruktur Worker</h1>` +
-    `<p>Daftar node builder yang tersedia untuk kompilasi APK:</p>` +
-    `<table bordered compact striped>` +
-    `<tr><th>Node Worker</th><th>Status</th><th>Antrean</th></tr>` +
-    `<tr><td>🖥️ Worker 1 (VPS DO 16GB)</td><td><b>${vpsStatusText}</b></td><td><b>${vpsInfo.queueLength} antrean</b></td></tr>` +
-    `<tr><td>☁️ Worker 2 (GitHub Actions)</td><td><b>🟢 Online</b></td><td>Cloud Pool</td></tr>` +
-    `</table>` +
-    `<details open><summary><b>Detail Beban Worker 1:</b></summary>` +
-    `<p>• Status Eksekusi: <b>${vpsActivity}</b></p>` +
-    `<p>• Lokasi: <b>RexyHost Dedicated</b></p>` +
-    `<p>• RAM / Spesifikasi: <b>16 GB RAM / High-Speed SSD</b></p>` +
-    `</details>`;
+    `<h1>📊 Status Worker</h1>` +
+    `<p>• 🖥️ <b>VPS Worker (16GB):</b> ${vpsStatusText} (${vpsInfo.queueLength} antre)</p>` +
+    `<p>• ☁️ <b>GitHub Cloud:</b> 🟢 Online</p>`;
 
   return telegram.sendRichMessage(chatId, html, { reply_markup: createStartKeyboard() });
 }
 
 async function sendEngineSelection(chatId, fileType) {
-  const typeName = fileType === 'zip' ? 'Flutter (ZIP)' : 'Android WebView (HTML)';
+  const typeName = fileType === 'zip' ? 'Flutter' : 'HTML';
   const vpsInfo = await vps.getStatus();
-  const vpsStatusBadge = vpsInfo.status === 'online' ? '🟢 ON' : '🔴 OFF';
+  const vpsBadge = vpsInfo.status === 'online' ? '🟢 ON' : '🔴 OFF';
 
   const html = 
-    `<h1>⚙️ Pilih Jalur Kompilasi (${typeName})</h1>` +
-    `<p>Silakan tentukan infrastruktur yang ingin kamu gunakan untuk mengompilasi APK:</p>` +
-    `<table bordered compact striped>` +
-    `<tr><th>Pilihan Jalur</th><th>Kelebihan</th><th>Ketersediaan</th></tr>` +
-    `<tr><td>🖥️ <b>VPS Worker</b></td><td>Dedicated 16GB RAM, Cepat & Tanpa Batas</td><td><b>${vpsStatusBadge}</b> (${vpsInfo.queueLength} antre)</td></tr>` +
-    `<tr><td>☁️ <b>GitHub Cloud</b></td><td>Multi-Runner Paralel Resmi</td><td><b>🟢 ON</b></td></tr>` +
-    `</table>` +
-    `<p><i>Pilih opsi di bawah untuk melanjutkan ke pengiriman berkas:</i></p>`;
+    `<h1>⚙️ Pilih Jalur (${typeName})</h1>` +
+    `<p>Pilih server untuk mengompilasi APK:</p>` +
+    `<p>• 🖥️ <b>VPS Worker:</b> ${vpsBadge} (${vpsInfo.queueLength} antre)</p>` +
+    `<p>• ☁️ <b>GitHub Cloud:</b> 🟢 ON</p>`;
 
   return telegram.sendRichMessage(chatId, html, {
     reply_markup: createEngineSelectionKeyboard(fileType)
@@ -602,21 +580,12 @@ async function handleZipUpload(chatId, userId, doc, messageId) {
     });
 
     const confirmHtml = 
-      `<h1>📦 Proyek Flutter Terdeteksi!</h1>` +
-      `<table bordered compact striped>` +
-      `<tr><th>Properti</th><th>Keterangan</th></tr>` +
-      `<tr><td>🏷️ Nama App</td><td><b>${inspection.name}</b></td></tr>` +
-      `<tr><td>🔢 Versi</td><td><code>${inspection.version}</code></td></tr>` +
-      `<tr><td>📁 Total Berkas</td><td>${inspection.totalFiles} berkas</td></tr>` +
-      `<tr><td>📦 Ukuran</td><td>${(fileSize / (1024 * 1024)).toFixed(1)} MB</td></tr>` +
-      `</table>` +
-      `<details open><summary><b>⚙️ Pilih Mode Kompilasi:</b></summary>` +
-      `<p>• <b>🚀 Release APK:</b> Teroptimasi, ukuran lebih kecil, siap rilis.</p>` +
-      `<p>• <b>⚡ Debug APK:</b> Kompilasi jauh lebih cepat, cocok untuk testing.</p>` +
-      `</details>` +
+      `<h1>📦 Proyek Flutter</h1>` +
+      `<p>• 🏷️ <b>App:</b> <b>${inspection.name}</b> (v${inspection.version})</p>` +
+      `<p>• 📁 <b>Berkas:</b> ${inspection.totalFiles} • <b>Ukuran:</b> ${(fileSize / (1024 * 1024)).toFixed(1)} MB</p>` +
       `<tg-button-row>` +
-      `<tg-button type="callback_data" style="success" data="build_release_${buildId}">🚀 Build Release APK</tg-button>` +
-      `<tg-button type="callback_data" style="primary" data="build_debug_${buildId}">⚡ Build Debug APK</tg-button>` +
+      `<tg-button type="callback_data" style="success" data="build_release_${buildId}">🚀 Release APK</tg-button>` +
+      `<tg-button type="callback_data" style="primary" data="build_debug_${buildId}">⚡ Debug APK</tg-button>` +
       `</tg-button-row>` +
       `<tg-button-row>` +
       `<tg-button type="callback_data" style="danger" data="cancel_${buildId}">❌ Batal</tg-button>` +
@@ -701,20 +670,11 @@ async function handleHtmlUpload(chatId, userId, doc, messageId) {
     });
 
     const confirmHtml = 
-      `<h1>🌐 Berkas HTML Diterima!</h1>` +
-      `<table bordered compact striped>` +
-      `<tr><th>Properti</th><th>Keterangan</th></tr>` +
-      `<tr><td>📱 Tipe Target</td><td>Android WebView APK</td></tr>` +
-      `<tr><td>🏷️ Nama App</td><td><b>${appName}</b></td></tr>` +
-      `<tr><td>⚡ Fitur</td><td>Fullscreen, JavaScript & DOM Storage</td></tr>` +
-      `</table>` +
-      `<details open><summary><b>⚙️ Pilih Mode Kompilasi:</b></summary>` +
-      `<p>• <b>🚀 Release APK:</b> Teroptimasi untuk rilis/instalasi final.</p>` +
-      `<p>• <b>⚡ Debug APK:</b> Kompilasi cepat langsung dari template Gradle.</p>` +
-      `</details>` +
+      `<h1>🌐 Berkas HTML</h1>` +
+      `<p>• 🏷️ <b>App:</b> <b>${appName}</b> (Android WebView)</p>` +
       `<tg-button-row>` +
-      `<tg-button type="callback_data" style="success" data="build_release_${buildId}">🚀 Build Release APK</tg-button>` +
-      `<tg-button type="callback_data" style="primary" data="build_debug_${buildId}">⚡ Build Debug APK</tg-button>` +
+      `<tg-button type="callback_data" style="success" data="build_release_${buildId}">🚀 Release APK</tg-button>` +
+      `<tg-button type="callback_data" style="primary" data="build_debug_${buildId}">⚡ Debug APK</tg-button>` +
       `</tg-button-row>` +
       `<tg-button-row>` +
       `<tg-button type="callback_data" style="danger" data="cancel_${buildId}">❌ Batal</tg-button>` +
@@ -757,19 +717,11 @@ async function handleRawHtmlText(chatId, userId, htmlText) {
     });
 
     const confirmHtml = 
-      `<h1>🌐 Kode HTML Diterima!</h1>` +
-      `<table bordered compact striped>` +
-      `<tr><th>Properti</th><th>Keterangan</th></tr>` +
-      `<tr><td>📱 Tipe Target</td><td>Android WebView APK</td></tr>` +
-      `<tr><td>🏷️ Nama App</td><td><b>${appName}</b></td></tr>` +
-      `</table>` +
-      `<details open><summary><b>⚙️ Pilih Mode Kompilasi:</b></summary>` +
-      `<p>• <b>🚀 Release APK:</b> Teroptimasi untuk rilis/instalasi final.</p>` +
-      `<p>• <b>⚡ Debug APK:</b> Kompilasi cepat langsung dari template Gradle.</p>` +
-      `</details>` +
+      `<h1>🌐 Kode HTML</h1>` +
+      `<p>• 🏷️ <b>App:</b> <b>${appName}</b> (Android WebView)</p>` +
       `<tg-button-row>` +
-      `<tg-button type="callback_data" style="success" data="build_release_${buildId}">🚀 Build Release APK</tg-button>` +
-      `<tg-button type="callback_data" style="primary" data="build_debug_${buildId}">⚡ Build Debug APK</tg-button>` +
+      `<tg-button type="callback_data" style="success" data="build_release_${buildId}">🚀 Release APK</tg-button>` +
+      `<tg-button type="callback_data" style="primary" data="build_debug_${buildId}">⚡ Debug APK</tg-button>` +
       `</tg-button-row>` +
       `<tg-button-row>` +
       `<tg-button type="callback_data" style="danger" data="cancel_${buildId}">❌ Batal</tg-button>` +

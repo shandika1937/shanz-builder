@@ -19,7 +19,6 @@ test('handleStart formats greeting and uses sendRichMessage with styled buttons'
   assert.equal(res.message_id, 100);
   assert.ok(sentPayload.html.includes('Shanz'));
   assert.ok(sentPayload.html.toLowerCase().includes('apk cloud builder'));
-  assert.ok(sentPayload.html.includes('table'));
   assert.ok(sentPayload.html.includes('tg-button'));
   assert.ok(sentPayload.options.reply_markup.inline_keyboard);
 });
