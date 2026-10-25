@@ -56,7 +56,8 @@ async function checkUserMembership(userId) {
     return ['creator', 'administrator', 'member', 'restricted'].includes(member.status);
   } catch (err) {
     console.error(`Check membership error for ${userId}:`, err.message);
-    return false;
+    // Jika bot belum admin atau gagal cek grup, JANGAN blokir user (izinkan agar bot tidak macet)
+    return true;
   }
 }
 
@@ -240,18 +241,25 @@ async function handleMessage(msg) {
   const userId = String(msg.from.id);
   const text = msg.text ? msg.text.trim() : '';
 
-  // Hapus keyboard menu secara permanen jika pesan berasal dari grup/supergroup
+  // Jika pesan dari grup/supergroup:
+  // Diamkan total (ignore) KECUALI jika bot di-tag secara eksplisit
   if (chatType !== 'private') {
-    return telegram.sendMessage(
-      chatId,
-      `⚠️ <b>Bot Ini Hanya Bisa Digunakan di Chat Pribadi (PM)!</b>\n\nKeyboard di grup ini telah dibersihkan. Silakan gunakan bot langsung di PM.`,
-      {
-        reply_markup: {
-          remove_keyboard: true,
-          selective: false
+    const isBotTagged = text.includes('@ZIP2APKBOT') || text.startsWith('/start@ZIP2APKBOT') || text.startsWith('/help@ZIP2APKBOT');
+    if (isBotTagged) {
+      return telegram.sendMessage(
+        chatId,
+        `⚠️ <b>Halo! Bot ini hanya dapat digunakan melalui Chat Pribadi (PM).</b>\n\nSilakan klik tombol di bawah untuk membuka bot langsung di PM.`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '💬 Buka Bot di PM', url: 'https://t.me/ZIP2APKBOT?start=start' }]
+            ]
+          }
         }
-      }
-    ).catch(() => {});
+      ).catch(() => {});
+    }
+    // Jika tidak di-tag, diam total (jangan balas apa-apa)
+    return;
   }
 
   // Mode Publik: Semua pengguna Telegram dapat mengakses dan mengompilasi APK!
