@@ -6,11 +6,13 @@ import {
   downloadLargeFile,
   makeProgressBar,
   createStartKeyboard,
+  createEngineSelectionKeyboard,
   createRemoveKeyboard,
   createCancelKeyboard,
   createConfirmKeyboard
 } from './services/telegram.js';
 import { GitHubBuilderService } from './services/github.js';
+import { VpsBuilderService } from './services/vps.js';
 import { inspectZipProject } from './handlers/zipHandler.js';
 import { packageHtmlToAndroidProject } from './handlers/htmlHandler.js';
 import { handleStart } from './handlers/start.js';
@@ -22,6 +24,11 @@ const github = new GitHubBuilderService({
   token: config.githubToken,
   owner: config.repoOwner,
   repo: config.repoName
+});
+
+const vps = new VpsBuilderService({
+  host: process.env.VPS_WORKER_URL || 'http://68.183.46.92:3000',
+  secret: process.env.VPS_WORKER_SECRET || 'shanz_builder_secret_2026'
 });
 
 // Ensure temp directory exists
@@ -89,6 +96,48 @@ async function sendCreditsInfo(chatId, userId) {
     `<tg-button type="url" style="primary" url="https://t.me/ShanzRL">💬 Hubungi Owner</tg-button>` +
     `</tg-button-row>`;
   return telegram.sendRichMessage(chatId, html, { reply_markup: createStartKeyboard() });
+}
+
+async function sendWorkersStatus(chatId) {
+  const vpsInfo = await vps.getStatus();
+  const vpsStatusText = vpsInfo.status === 'online' ? '🟢 Online' : '🔴 Offline';
+  const vpsActivity = vpsInfo.isBuilding ? `⚙️ Sedang Mengompilasi (${vpsInfo.currentBuild?.appName || 'App'})` : '💤 Idle (Siap Menerima Build)';
+
+  const html = 
+    `<h1>📊 Status Infrastruktur Worker</h1>` +
+    `<p>Daftar node builder yang tersedia untuk kompilasi APK:</p>` +
+    `<table bordered compact striped>` +
+    `<tr><th>Node Worker</th><th>Status</th><th>Antrean</th></tr>` +
+    `<tr><td>🖥️ Worker 1 (VPS DO 16GB)</td><td><b>${vpsStatusText}</b></td><td><b>${vpsInfo.queueLength} antrean</b></td></tr>` +
+    `<tr><td>☁️ Worker 2 (GitHub Actions)</td><td><b>🟢 Online</b></td><td>Cloud Pool</td></tr>` +
+    `</table>` +
+    `<details open><summary><b>Detail Beban Worker 1:</b></summary>` +
+    `<p>• Status Eksekusi: <b>${vpsActivity}</b></p>` +
+    `<p>• Lokasi: <b>RexyHost Dedicated</b></p>` +
+    `<p>• RAM / Spesifikasi: <b>16 GB RAM / High-Speed SSD</b></p>` +
+    `</details>`;
+
+  return telegram.sendRichMessage(chatId, html, { reply_markup: createStartKeyboard() });
+}
+
+async function sendEngineSelection(chatId, fileType) {
+  const typeName = fileType === 'zip' ? 'Flutter (ZIP)' : 'Android WebView (HTML)';
+  const vpsInfo = await vps.getStatus();
+  const vpsStatusBadge = vpsInfo.status === 'online' ? '🟢 ON' : '🔴 OFF';
+
+  const html = 
+    `<h1>⚙️ Pilih Jalur Kompilasi (${typeName})</h1>` +
+    `<p>Silakan tentukan infrastruktur yang ingin kamu gunakan untuk mengompilasi APK:</p>` +
+    `<table bordered compact striped>` +
+    `<tr><th>Pilihan Jalur</th><th>Kelebihan</th><th>Ketersediaan</th></tr>` +
+    `<tr><td>🖥️ <b>VPS Worker</b></td><td>Dedicated 16GB RAM, Cepat & Tanpa Batas</td><td><b>${vpsStatusBadge}</b> (${vpsInfo.queueLength} antre)</td></tr>` +
+    `<tr><td>☁️ <b>GitHub Cloud</b></td><td>Multi-Runner Paralel Resmi</td><td><b>🟢 ON</b></td></tr>` +
+    `</table>` +
+    `<p><i>Pilih opsi di bawah untuk melanjutkan ke pengiriman berkas:</i></p>`;
+
+  return telegram.sendRichMessage(chatId, html, {
+    reply_markup: createEngineSelectionKeyboard(fileType)
+  });
 }
 
 async function sendOwnerInfo(chatId) {
@@ -285,14 +334,50 @@ async function handleCallbackQuery(query) {
 
   await telegram.answerCallbackQuery(query.id);
 
+  if (data === 'select_zip_engine') {
+    return sendEngineSelection(chatId, 'zip');
+  }
+
+  if (data === 'select_html_engine') {
+    return sendEngineSelection(chatId, 'html');
+  }
+
+  if (data === 'check_workers') {
+    return sendWorkersStatus(chatId);
+  }
+
+  if (data.startsWith('engine_vps_')) {
+    const fileType = data.replace('engine_vps_', '');
+    userSessions.set(userId, { mode: fileType, engine: 'vps' });
+    const vpsInfo = await vps.getStatus();
+    const queueNote = vpsInfo.queueLength > 0 ? `\n\n⏳ <i>Saat ini ada <b>${vpsInfo.queueLength} antrean</b> di worker ini.</i>` : '';
+    return telegram.sendRichMessage(
+      chatId,
+      `<h1>🖥️ Jalur VPS Worker 1 Dipilih!</h1>` +
+      `<p>Status Node: <b>${vpsInfo.status === 'online' ? '🟢 Online (Dedicated 16GB)' : '🔴 Offline'}</b>${queueNote}</p>` +
+      `<p>Silakan kirimkan berkas <b>${fileType === 'zip' ? '.zip Flutter' : '.html'}</b> kamu sekarang.</p>`,
+      { reply_markup: createStartKeyboard() }
+    );
+  }
+
+  if (data.startsWith('engine_github_')) {
+    const fileType = data.replace('engine_github_', '');
+    userSessions.set(userId, { mode: fileType, engine: 'github' });
+    return telegram.sendRichMessage(
+      chatId,
+      `<h1>☁️ Jalur GitHub Actions Dipilih!</h1>` +
+      `<p>Status Node: <b>🟢 Online (Multi-Runner Cloud)</b></p>` +
+      `<p>Silakan kirimkan berkas <b>${fileType === 'zip' ? '.zip Flutter' : '.html'}</b> kamu sekarang.</p>`,
+      { reply_markup: createStartKeyboard() }
+    );
+  }
+
   if (data === 'mode_zip') {
-    userSessions.set(userId, { mode: 'zip' });
-    return sendZipModeInfo(chatId);
+    return sendEngineSelection(chatId, 'zip');
   }
 
   if (data === 'mode_html') {
-    userSessions.set(userId, { mode: 'html' });
-    return sendHtmlModeInfo(chatId);
+    return sendEngineSelection(chatId, 'html');
   }
 
   if (data === 'check_credits') {
@@ -425,10 +510,14 @@ async function handleZipUpload(chatId, userId, doc, messageId) {
       );
     }
 
+    const userSession = userSessions.get(userId) || {};
+    const selectedEngine = userSession.engine || 'vps'; // Default to VPS jika belum memilih
+
     savePendingBuild(buildId, {
       buildId,
       type: 'flutter',
       userId,
+      engine: selectedEngine,
       appName: inspection.name,
       version: inspection.version,
       zipPath
@@ -521,10 +610,14 @@ async function handleHtmlUpload(chatId, userId, doc, messageId) {
     const projectZip = await packageHtmlToAndroidProject(htmlBuffer, { appName });
     fs.writeFileSync(zipPath, projectZip);
 
+    const userSession = userSessions.get(userId) || {};
+    const selectedEngine = userSession.engine || 'vps';
+
     savePendingBuild(buildId, {
       buildId,
       type: 'html',
       userId,
+      engine: selectedEngine,
       appName,
       zipPath
     });
@@ -619,8 +712,134 @@ async function handleRawHtmlText(chatId, userId, htmlText) {
 }
 
 async function executeBuild(chatId, messageId, buildData) {
-  const { buildId, type, appName, zipPath, buildMode = 'release' } = buildData;
+  const { buildId, type, appName, zipPath, buildMode = 'release', engine = 'vps' } = buildData;
   const zipBuffer = fs.readFileSync(zipPath);
+
+  // Jika jalur yang dipilih adalah VPS Builder
+  if (engine === 'vps') {
+    return executeBuildVps(chatId, messageId, { buildId, type, appName, zipPath, zipBuffer, buildMode });
+  }
+
+  // Jika jalur yang dipilih adalah GitHub Actions
+  return executeBuildGitHub(chatId, messageId, { buildId, type, appName, zipPath, zipBuffer, buildMode });
+}
+
+async function executeBuildVps(chatId, messageId, buildData) {
+  const { buildId, type, appName, zipBuffer, buildMode } = buildData;
+
+  const initialHtml = 
+    `<h1>🚀 Menyiapkan Antrean VPS Worker 1...</h1>` +
+    `<p>Aplikasi: <b>${appName}</b> (Worker: <b>VPS DO 16GB</b> • <b>${buildMode.toUpperCase()}</b>)</p>` +
+    `<pre>[░░░░░░░░░░] 0% (Mengirimkan payload ke VPS Builder...)</pre>` +
+    `<tg-button-row><tg-button type="callback_data" style="danger" data="cancel_${buildId}">❌ Batalkan</tg-button></tg-button-row>`;
+
+  await telegram.editRichMessage(chatId, messageId, initialHtml, {
+    reply_markup: createCancelKeyboard(buildId)
+  });
+
+  try {
+    // 1. Submit to VPS Worker Server
+    const submitRes = await vps.submitBuild({
+      buildId,
+      type,
+      buildMode,
+      appName,
+      zipBuffer
+    });
+
+    // 2. Poll VPS status with live queue position & progress bar
+    let lastStatusText = '';
+    const pollInterval = setInterval(async () => {
+      try {
+        const info = await vps.pollBuildStatus(buildId);
+        const bar = makeProgressBar(info.percent || 10);
+        const statusNote = info.status === 'queued'
+          ? `⏳ Dalam Antrean (Urutan ke-${info.position})`
+          : `⚙️ Sedang Mengompilasi (${info.elapsedSec || 0}s)`;
+
+        const progressHtml = 
+          `<h1>🖥️ Kompilasi VPS Worker 1 Berjalan...</h1>` +
+          `<p>Aplikasi: <b>${appName}</b> (${type === 'flutter' ? 'Flutter' : 'WebView'} • <b>${buildMode.toUpperCase()}</b>)</p>` +
+          `<pre>[${bar}] ${info.percent || 10}% (${info.elapsedSec || 0}s)</pre>` +
+          `<details open><summary><b>Status Mesin:</b></summary>` +
+          `<p>• Status: <b>${statusNote}</b></p>` +
+          `<p>• Detail: <i>${info.message || 'Memproses berkas...'}</i></p>` +
+          `<p>• Node: <b>RexyHost Dedicated (16GB RAM)</b></p>` +
+          `</details>` +
+          `<tg-button-row><tg-button type="callback_data" style="danger" data="cancel_${buildId}">❌ Batalkan</tg-button></tg-button-row>`;
+
+        if (progressHtml !== lastStatusText) {
+          lastStatusText = progressHtml;
+          telegram.editRichMessage(chatId, messageId, progressHtml, {
+            reply_markup: createCancelKeyboard(buildId)
+          }).catch(() => {});
+        }
+
+        if (info.status === 'completed') {
+          clearInterval(pollInterval);
+
+          if (info.conclusion !== 'success') {
+            deletePendingBuild(buildId);
+            return telegram.editRichMessage(
+              chatId,
+              messageId,
+              `<h1>❌ Kompilasi di VPS Gagal!</h1><p>Kompilasi di VPS Worker menemui kendala:</p><pre>${info.error || info.message}</pre>`,
+              { reply_markup: createStartKeyboard() }
+            );
+          }
+
+          // Success - Download APK directly from VPS
+          await telegram.editRichMessage(
+            chatId,
+            messageId,
+            `<h1>✅ Kompilasi Selesai!</h1><pre>[██████████] 100%</pre><p>⏳ Mengambil file APK dari VPS dan mengirimkannya...</p>`
+          );
+
+          const artifact = await vps.downloadArtifact(buildId);
+          const consumed = creditManager.consumeCredit(buildData.userId);
+          const sisaText = consumed.remaining === Infinity ? '♾️ Unlimited' : `${consumed.remaining} Credit`;
+
+          const caption = `🎉 <b>APK Berhasil Dibuat via VPS Worker!</b>\n\n` +
+            `🏷️ <b>Nama File:</b> <code>${artifact.fileName}</code>\n` +
+            `🖥️ <b>Worker:</b> VPS RexyHost (16GB RAM)\n` +
+            `⚡ <b>Mode:</b> ${buildMode.toUpperCase()}\n` +
+            `📦 <b>Ukuran:</b> ${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB\n` +
+            `💳 <b>Sisa Credit:</b> <code>${sisaText}</code>\n\n` +
+            `👑 <b>Owner:</b> @ShanzRL | 🤝 <b>Co-Owner:</b> @gamersbug`;
+
+          if (artifact.fileSize <= 50 * 1024 * 1024) {
+            await telegram.sendDocument(chatId, artifact.apkBuffer, artifact.fileName, caption, {
+              reply_markup: createStartKeyboard()
+            });
+          } else {
+            await telegram.sendRichMessage(
+              chatId,
+              `<h1>🎉 APK Berhasil Dibuat!</h1><p>🏷️ <b>Berkas:</b> <code>${artifact.fileName}</code> (${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB)</p><p>⚡ <b>Mode:</b> ${buildMode.toUpperCase()}</p><p>⚠️ <i>Ukuran melebihi batas 50 MB bot Telegram.</i></p><tg-button-row><tg-button type="url" style="success" url="${artifact.directUrl}">📥 Unduh APK Langsung</tg-button></tg-button-row>`,
+              { reply_markup: createStartKeyboard() }
+            );
+          }
+
+          deletePendingBuild(buildId);
+        }
+      } catch (err) {
+        clearInterval(pollInterval);
+        console.error('VPS Poll Error:', err);
+      }
+    }, 4000);
+
+  } catch (err) {
+    deletePendingBuild(buildId);
+    return telegram.editRichMessage(
+      chatId,
+      messageId,
+      `<h1>❌ Gagal Mengirim Proyek ke VPS Worker</h1><p>${err.message}</p>`,
+      { reply_markup: createStartKeyboard() }
+    );
+  }
+}
+
+async function executeBuildGitHub(chatId, messageId, buildData) {
+  const { buildId, type, appName, zipBuffer, buildMode } = buildData;
 
   const initialHtml = 
     `<h1>🚀 Menyiapkan Kompilasi Cloud...</h1>` +

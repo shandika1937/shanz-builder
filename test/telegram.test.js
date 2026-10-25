@@ -15,15 +15,19 @@ test('createStartKeyboard generates inline keyboard with styled buttons and cont
 
   const zipBtn = kb.inline_keyboard[0][0];
   assert.equal(zipBtn.style, 'primary');
-  assert.equal(zipBtn.callback_data, 'mode_zip');
+  assert.equal(zipBtn.callback_data, 'select_zip_engine');
 
   const htmlBtn = kb.inline_keyboard[0][1];
   assert.equal(htmlBtn.style, 'success');
-  assert.equal(htmlBtn.callback_data, 'mode_html');
+  assert.equal(htmlBtn.callback_data, 'select_html_engine');
 
-  const creditBtn = kb.inline_keyboard[1][0];
+  const workersBtn = kb.inline_keyboard[1][0];
+  assert.equal(workersBtn.callback_data, 'check_workers');
+  assert.equal(workersBtn.style, 'primary');
+
+  const creditBtn = kb.inline_keyboard[1][1];
   assert.equal(creditBtn.callback_data, 'check_credits');
-  assert.equal(creditBtn.style, 'primary');
+  assert.equal(creditBtn.style, 'success');
 });
 
 test('createRemoveKeyboard generates remove_keyboard object', () => {

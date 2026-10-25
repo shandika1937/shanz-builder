@@ -59,26 +59,59 @@ export async function downloadLargeFile(apiId, apiHash, botToken, sessionStr, ch
   return client.downloadMedia(msgs[0].media, downloadOpts);
 }
 
+export function createEngineSelectionKeyboard(fileType) {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: '🖥️ Kompilasi via VPS Worker (Cepat & Dedicated)',
+          callback_data: `engine_vps_${fileType}`,
+          style: 'primary'
+        }
+      ],
+      [
+        {
+          text: '☁️ Kompilasi via GitHub Actions (Cloud Runner)',
+          callback_data: `engine_github_${fileType}`,
+          style: 'success'
+        }
+      ],
+      [
+        {
+          text: '📊 Cek Status Worker VPS',
+          callback_data: 'check_workers',
+          style: 'primary'
+        }
+      ]
+    ]
+  };
+}
+
 export function createStartKeyboard() {
   return {
     inline_keyboard: [
       [
         {
           text: '📦 Build ZIP to APK',
-          callback_data: 'mode_zip',
+          callback_data: 'select_zip_engine',
           style: 'primary'
         },
         {
           text: '🌐 Build HTML to APK',
-          callback_data: 'mode_html',
+          callback_data: 'select_html_engine',
           style: 'success'
         }
       ],
       [
         {
-          text: '💳 Cek Sisa Credit',
-          callback_data: 'check_credits',
+          text: '📊 Status Worker VPS',
+          callback_data: 'check_workers',
           style: 'primary'
+        },
+        {
+          text: '💳 Sisa Credit',
+          callback_data: 'check_credits',
+          style: 'success'
         }
       ]
     ]
