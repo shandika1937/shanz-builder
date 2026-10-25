@@ -12,14 +12,34 @@ export async function getMtprotoClient(apiId, apiHash, botToken) {
   return mtprotoClient;
 }
 
-export async function downloadLargeFile(apiId, apiHash, botToken, chatId, messageId, onProgress) {
+export function makeProgressBar(percent) {
+  const total = 10;
+  const p = Math.min(100, Math.max(0, percent));
+  const filled = Math.round((p / 100) * total);
+  const empty = total - filled;
+  return '█'.repeat(filled) + '░'.repeat(empty);
+}
+
+export async function downloadLargeFile(apiId, apiHash, botToken, chatId, messageId, onProgress = () => {}) {
   const client = await getMtprotoClient(apiId, apiHash, botToken);
   const msgs = await client.getMessages(String(chatId), { ids: [Number(messageId)] });
   if (!msgs || msgs.length === 0 || !msgs[0].media) {
     throw new Error('Pesan atau berkas media tidak ditemukan di MTProto');
   }
+
+  let lastUpdate = 0;
   return client.downloadMedia(msgs[0].media, {
-    progressCallback: onProgress
+    workers: 4,
+    progressCallback: (downloaded, total) => {
+      const now = Date.now();
+      const d = Number(downloaded);
+      const t = Number(total);
+      const percent = t > 0 ? Math.floor((d / t) * 100) : 0;
+      if (now - lastUpdate >= 1400 || percent === 100) {
+        lastUpdate = now;
+        onProgress(d, t, percent);
+      }
+    }
   });
 }
 
@@ -139,6 +159,21 @@ export class TelegramClient {
     } catch {
       // Fallback to standard sendMessage if client doesn't support rich blocks
       return this.sendMessage(chatId, htmlContent, extra);
+    }
+  }
+
+  async editRichMessage(chatId, messageId, htmlContent, extra = {}) {
+    try {
+      return await this.call('editMessageText', {
+        chat_id: chatId,
+        message_id: messageId,
+        rich_message: {
+          html: htmlContent
+        },
+        ...extra
+      });
+    } catch {
+      return this.editMessageText(chatId, messageId, htmlContent, extra);
     }
   }
 
