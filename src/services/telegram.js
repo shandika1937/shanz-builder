@@ -1,14 +1,17 @@
 let mtprotoClient = null;
 
-export async function getMtprotoClient(apiId, apiHash, botToken) {
-  if (mtprotoClient) return mtprotoClient;
+export async function getMtprotoClient(apiId, apiHash, botToken, sessionStr = '') {
+  if (mtprotoClient && mtprotoClient.connected) return mtprotoClient;
   const { TelegramClient: GramClient } = await import('telegram');
   const { StringSession } = await import('telegram/sessions/index.js');
 
-  mtprotoClient = new GramClient(new StringSession(''), Number(apiId), apiHash, {
+  mtprotoClient = new GramClient(new StringSession(sessionStr || ''), Number(apiId), apiHash, {
     connectionRetries: 5
   });
-  await mtprotoClient.start({ botAuthToken: botToken });
+  await mtprotoClient.connect();
+  if (!(await mtprotoClient.checkAuthorization())) {
+    await mtprotoClient.start({ botAuthToken: botToken });
+  }
   return mtprotoClient;
 }
 
@@ -20,14 +23,20 @@ export function makeProgressBar(percent) {
   return '█'.repeat(filled) + '░'.repeat(empty);
 }
 
-export async function downloadLargeFile(apiId, apiHash, botToken, chatId, messageId, onProgress = () => {}) {
-  const client = await getMtprotoClient(apiId, apiHash, botToken);
+export async function downloadLargeFile(apiId, apiHash, botToken, sessionStr, chatId, messageId, onProgress = () => {}) {
+  const client = await getMtprotoClient(apiId, apiHash, botToken, sessionStr);
   const msgs = await client.getMessages(String(chatId), { ids: [Number(messageId)] });
   if (!msgs || msgs.length === 0 || !msgs[0].media) {
     throw new Error('Pesan atau berkas media tidak ditemukan di MTProto');
   }
 
-  let lastUpdate = 0;
+  let lastPercent = -1;
+  let lastTime = 0;
+
+  // Fire initial progress notification
+  const totalBytes = Number(msgs[0].media.document ? msgs[0].media.document.size : 100);
+  onProgress(1, totalBytes, 1);
+
   return client.downloadMedia(msgs[0].media, {
     workers: 4,
     progressCallback: (downloaded, total) => {
@@ -35,8 +44,9 @@ export async function downloadLargeFile(apiId, apiHash, botToken, chatId, messag
       const d = Number(downloaded);
       const t = Number(total);
       const percent = t > 0 ? Math.floor((d / t) * 100) : 0;
-      if (now - lastUpdate >= 1400 || percent === 100) {
-        lastUpdate = now;
+      if ((percent - lastPercent >= 3 && now - lastTime >= 1200) || percent === 100) {
+        lastPercent = percent;
+        lastTime = now;
         onProgress(d, t, percent);
       }
     }
@@ -179,8 +189,15 @@ export class TelegramClient {
         },
         ...extra
       });
-    } catch {
-      return this.editMessageText(chatId, messageId, htmlContent, extra);
+    } catch (err) {
+      if (err.message && err.message.includes('message is not modified')) {
+        return null;
+      }
+      try {
+        return await this.editMessageText(chatId, messageId, htmlContent.replace(/<[^>]+>/g, ''), extra);
+      } catch {
+        return null;
+      }
     }
   }
 

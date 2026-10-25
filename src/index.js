@@ -99,6 +99,20 @@ async function handleMessage(msg) {
   const userId = String(msg.from.id);
   const text = msg.text ? msg.text.trim() : '';
 
+  const isAuthorized = userId === String(config.ownerId) || userId === String(config.coOwnerId);
+  if (!isAuthorized) {
+    return telegram.sendRichMessage(
+      chatId,
+      `<h1>🚫 Akses Khusus Owner & Co-Owner</h1>` +
+      `<p>Mohon maaf, bot kompilasi cloud ini bersifat <b>privat</b> dan hanya dapat diakses oleh:</p>` +
+      `<p>• 👑 <b>Owner:</b> <a href="https://t.me/ShanzRL">@ShanzRL</a> (ID: <code>8594510495</code>)</p>` +
+      `<p>• 🤝 <b>Co-Owner:</b> <a href="https://t.me/gamersbug">@gamersbug</a> (ID: <code>8728564869</code>)</p>` +
+      `<tg-button-row>` +
+      `<tg-button type="url" style="primary" url="https://t.me/ShanzRL">💬 Hubungi Owner</tg-button>` +
+      `</tg-button-row>`
+    );
+  }
+
   // Start / Help command
   if (text === '/start' || text === '/help') {
     userSessions.set(userId, { mode: 'idle' });
@@ -156,6 +170,11 @@ async function handleCallbackQuery(query) {
   const messageId = query.message.message_id;
   const userId = String(query.from.id);
   const data = query.data;
+
+  const isAuthorized = userId === String(config.ownerId) || userId === String(config.coOwnerId);
+  if (!isAuthorized) {
+    return telegram.answerCallbackQuery(query.id, '🚫 Akses ditolak: Khusus Owner & Co-Owner.', true);
+  }
 
   await telegram.answerCallbackQuery(query.id);
 
@@ -221,6 +240,7 @@ async function handleZipUpload(chatId, userId, doc, messageId) {
         config.apiId,
         config.apiHash,
         config.botToken,
+        config.mtprotoSession,
         chatId,
         messageId,
         (d, t, pct) => {
@@ -241,6 +261,7 @@ async function handleZipUpload(chatId, userId, doc, messageId) {
             config.apiId,
             config.apiHash,
             config.botToken,
+            config.mtprotoSession,
             chatId,
             messageId,
             (d, t, pct) => {
@@ -327,6 +348,7 @@ async function handleHtmlUpload(chatId, userId, doc, messageId) {
         config.apiId,
         config.apiHash,
         config.botToken,
+        config.mtprotoSession,
         chatId,
         messageId,
         (d, t, pct) => {
@@ -345,6 +367,7 @@ async function handleHtmlUpload(chatId, userId, doc, messageId) {
             config.apiId,
             config.apiHash,
             config.botToken,
+            config.mtprotoSession,
             chatId,
             messageId
           );
