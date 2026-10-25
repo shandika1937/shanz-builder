@@ -1,10 +1,42 @@
 import { createStartKeyboard } from '../services/telegram.js';
 
+import { createStartKeyboard } from '../services/telegram.js';
+
 export async function handleStart(telegram, chatId, user, creditsInfo = null) {
   const name = user?.first_name ? user.first_name.replace(/[<>&"']/g, '') : 'Developer';
 
   const creditText = creditsInfo === Infinity ? '♾️ Unlimited (VIP/Owner)' : `${creditsInfo} Kali Build`;
   const bannerUrl = 'https://www.image2url.com/r2/default/images/1792928669194-94cc3a69-0c9c-4916-b107-7a293c2a9220.jpg';
+
+  // 1. Animasi Loading Tahap 1: Inisialisasi
+  const loadingMsg = await telegram.sendRichMessage(
+    chatId,
+    `<h1>⏳ Menghubungkan ke Cloud Builder...</h1>` +
+    `<pre>[▱▱▱▱▱▱▱▱▱▱] 15%</pre>` +
+    `<p>⚡ <i>Menginisialisasi sesi & profil pengembang...</i></p>`
+  );
+
+  // 2. Animasi Loading Tahap 2: Sinkronisasi Node
+  await new Promise(r => setTimeout(r, 650));
+  await telegram.editRichMessage(
+    chatId,
+    loadingMsg.message_id,
+    `<h1>⚙️ Menyinkronkan Infrastruktur Worker...</h1>` +
+    `<pre>[▰▰▰▰▰▱▱▱▱▱] 55%</pre>` +
+    `<p>🖥️ <i>Memeriksa kesiapan VPS Worker & Cloud Runner...</i></p>`
+  ).catch(() => {});
+
+  // 3. Animasi Loading Tahap 3: Membuka Menu
+  await new Promise(r => setTimeout(r, 650));
+  await telegram.editRichMessage(
+    chatId,
+    loadingMsg.message_id,
+    `<h1>✨ Membuka Antarmuka APK Builder...</h1>` +
+    `<pre>[▰▰▰▰▰▰▰▰▰▰] 100%</pre>` +
+    `<p>🚀 <i>Menyiapkan modul & tabel informasi...</i></p>`
+  ).catch(() => {});
+
+  await new Promise(r => setTimeout(r, 500));
 
   const richHtml = 
     `<img src="${bannerUrl}"/>` +
@@ -28,7 +60,7 @@ export async function handleStart(telegram, chatId, user, creditsInfo = null) {
     `<tg-button type="url" style="success" url="https://t.me/gamersbug">🤝 Co-Owner: @gamersbug</tg-button>` +
     `</tg-button-row>`;
 
-  return telegram.sendRichMessage(chatId, richHtml, {
+  return telegram.editRichMessage(chatId, loadingMsg.message_id, richHtml, {
     reply_markup: createStartKeyboard()
   });
 }
