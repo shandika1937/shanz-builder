@@ -157,10 +157,11 @@ async function handleMessage(msg) {
   if (chatType !== 'private') {
     return telegram.sendMessage(
       chatId,
-      `⚠️ <b>Bot Ini Hanya Bisa Digunakan di Chat Pribadi (PM)!</b>\n\nSilakan klik tombol di bawah untuk membuka chat langsung dengan bot.`,
+      `⚠️ <b>Bot Ini Hanya Bisa Digunakan di Chat Pribadi (PM)!</b>\n\nKeyboard di grup ini telah dibersihkan. Silakan gunakan bot langsung di PM.`,
       {
         reply_markup: {
-          remove_keyboard: true
+          remove_keyboard: true,
+          selective: false
         }
       }
     ).catch(() => {});
