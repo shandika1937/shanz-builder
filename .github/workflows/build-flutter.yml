@@ -24,7 +24,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -35,9 +35,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Flutter
+      - name: Setup Flutter 3.29.0
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.29.0'
           channel: 'stable'
           cache: true
 
@@ -68,10 +69,10 @@ jobs:
             fi
           fi
 
-          # Auto upgrade gradle wrapper if exists to prevent version mismatch
+          # Auto fix Gradle wrapper if exists
           if [ -f "android/gradle/wrapper/gradle-wrapper.properties" ]; then
-            sed -i 's/gradle-.*-all.zip/gradle-8.14-all.zip/g' android/gradle/wrapper/gradle-wrapper.properties
-            sed -i 's/gradle-.*-bin.zip/gradle-8.14-bin.zip/g' android/gradle/wrapper/gradle-wrapper.properties
+            sed -i 's/gradle-.*-all.zip/gradle-8.10.2-all.zip/g' android/gradle/wrapper/gradle-wrapper.properties
+            sed -i 's/gradle-.*-bin.zip/gradle-8.10.2-bin.zip/g' android/gradle/wrapper/gradle-wrapper.properties
           fi
 
           echo "Files in workspace root:"
