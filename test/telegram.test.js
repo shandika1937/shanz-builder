@@ -51,7 +51,10 @@ test('createCancelKeyboard generates cancel button with danger style', () => {
 test('createConfirmKeyboard generates confirm and cancel buttons with styles', () => {
   const kb = createConfirmKeyboard('1234');
   assert.equal(kb.inline_keyboard[0][0].style, 'success');
-  assert.equal(kb.inline_keyboard[0][1].style, 'danger');
+  assert.equal(kb.inline_keyboard[0][0].callback_data, 'build_release_1234');
+  assert.equal(kb.inline_keyboard[0][1].style, 'primary');
+  assert.equal(kb.inline_keyboard[0][1].callback_data, 'build_debug_1234');
+  assert.equal(kb.inline_keyboard[1][0].style, 'danger');
 });
 
 test('TelegramClient instantiates with token', () => {

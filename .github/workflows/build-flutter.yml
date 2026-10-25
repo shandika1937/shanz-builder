@@ -26,8 +26,18 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Unpack Project Payload
+      - name: Unpack Project Payload & Detect Mode
         run: |
+          BUILD_MODE="release"
+          if [ -f "build-info.json" ]; then
+            PARSED_MODE=$(jq -r '.buildMode // "release"' build-info.json)
+            if [ -n "$PARSED_MODE" ] && [ "$PARSED_MODE" != "null" ]; then
+              BUILD_MODE="$PARSED_MODE"
+            fi
+          fi
+          echo "TARGET_BUILD_MODE=$BUILD_MODE" >> $GITHUB_ENV
+          echo "Selected Build Mode: $BUILD_MODE"
+
           mkdir -p workspace
           unzip -q -o payload.zip -d workspace
           cd workspace
@@ -41,11 +51,17 @@ jobs:
           echo "Files in workspace:"
           ls -la
 
-      - name: Compile Flutter Release APK
+      - name: Compile Flutter APK
         working-directory: workspace
         run: |
           flutter pub get
-          flutter build apk --release
+          if [ "${{ env.TARGET_BUILD_MODE }}" = "debug" ]; then
+            echo "⚡ Building Debug APK..."
+            flutter build apk --debug
+          else
+            echo "🚀 Building Release APK..."
+            flutter build apk --release
+          fi
 
       - name: Find & Upload APK Artifact
         uses: actions/upload-artifact@v4

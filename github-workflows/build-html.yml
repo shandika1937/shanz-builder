@@ -23,8 +23,18 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Unpack Project Payload
+      - name: Unpack Project Payload & Detect Mode
         run: |
+          BUILD_MODE="release"
+          if [ -f "build-info.json" ]; then
+            PARSED_MODE=$(jq -r '.buildMode // "release"' build-info.json)
+            if [ -n "$PARSED_MODE" ] && [ "$PARSED_MODE" != "null" ]; then
+              BUILD_MODE="$PARSED_MODE"
+            fi
+          fi
+          echo "TARGET_BUILD_MODE=$BUILD_MODE" >> $GITHUB_ENV
+          echo "Selected Build Mode: $BUILD_MODE"
+
           mkdir -p workspace
           unzip -q -o payload.zip -d workspace
           cd workspace
@@ -34,11 +44,17 @@ jobs:
         working-directory: workspace
         run: |
           chmod +x ./gradlew || true
-          ./gradlew assembleRelease || gradle assembleRelease
+          if [ "${{ env.TARGET_BUILD_MODE }}" = "debug" ]; then
+            echo "⚡ Building Debug APK..."
+            ./gradlew assembleDebug || gradle assembleDebug
+          else
+            echo "🚀 Building Release APK..."
+            ./gradlew assembleRelease || gradle assembleRelease
+          fi
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: html-webview-apk
-          path: workspace/app/build/outputs/apk/release/*.apk
+          path: workspace/app/build/outputs/apk/**/*.apk
           retention-days: 1

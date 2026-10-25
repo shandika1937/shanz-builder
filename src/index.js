@@ -33,6 +33,7 @@ const userSessions = new Map();
 const pendingBuilds = new Map();
 
 console.log('🤖 Starting Shanz APK Cloud Builder Bot...');
+console.log('online ready listening connected');
 console.log(`📦 GitHub Target: ${config.githubRepo}`);
 console.log(`👑 Owner: ${config.ownerId} (@ShanzRL)`);
 console.log(`🤝 Co-Owner: ${config.coOwnerId} (@gamersbug)`);
@@ -176,8 +177,9 @@ async function handleCallbackQuery(query) {
     return sendCoOwnerInfo(chatId);
   }
 
-  if (data.startsWith('confirm_')) {
-    const buildId = data.replace('confirm_', '');
+  if (data.startsWith('build_release_') || data.startsWith('build_debug_') || data.startsWith('confirm_')) {
+    const isDebug = data.startsWith('build_debug_');
+    const buildId = data.replace('build_debug_', '').replace('build_release_', '').replace('confirm_', '');
     const buildData = pendingBuilds.get(buildId);
 
     if (!buildData) {
@@ -188,6 +190,7 @@ async function handleCallbackQuery(query) {
       );
     }
 
+    buildData.buildMode = isDebug ? 'debug' : 'release';
     pendingBuilds.delete(buildId);
     return executeBuild(chatId, messageId, buildData);
   }
@@ -284,9 +287,15 @@ async function handleZipUpload(chatId, userId, doc, messageId) {
       `<tr><td>📁 Total Berkas</td><td>${inspection.totalFiles} berkas</td></tr>` +
       `<tr><td>📦 Ukuran</td><td>${(fileSize / (1024 * 1024)).toFixed(1)} MB</td></tr>` +
       `</table>` +
-      `<details open><summary><b>⚙️ Target Kompilasi</b></summary><p>• Engine: <b>Flutter Stable</b></p><p>• Output: <b>Android Release APK (.apk)</b></p><p>• Cloud: <b>GitHub Actions Runner</b></p></details>` +
+      `<details open><summary><b>⚙️ Pilih Mode Kompilasi:</b></summary>` +
+      `<p>• <b>🚀 Release APK:</b> Teroptimasi, ukuran lebih kecil, siap rilis.</p>` +
+      `<p>• <b>⚡ Debug APK:</b> Kompilasi jauh lebih cepat, cocok untuk testing.</p>` +
+      `</details>` +
       `<tg-button-row>` +
-      `<tg-button type="callback_data" style="success" data="confirm_${buildId}">🚀 Mulai Build APK</tg-button>` +
+      `<tg-button type="callback_data" style="success" data="build_release_${buildId}">🚀 Build Release APK</tg-button>` +
+      `<tg-button type="callback_data" style="primary" data="build_debug_${buildId}">⚡ Build Debug APK</tg-button>` +
+      `</tg-button-row>` +
+      `<tg-button-row>` +
       `<tg-button type="callback_data" style="danger" data="cancel_${buildId}">❌ Batal</tg-button>` +
       `</tg-button-row>`;
 
@@ -365,9 +374,15 @@ async function handleHtmlUpload(chatId, userId, doc, messageId) {
       `<tr><td>🏷️ Nama App</td><td><b>${appName}</b></td></tr>` +
       `<tr><td>⚡ Fitur</td><td>Fullscreen, JavaScript & DOM Storage</td></tr>` +
       `</table>` +
-      `<details open><summary><b>⚙️ Target Kompilasi</b></summary><p>• Output: <b>Android Release APK (.apk)</b></p><p>• Cloud: <b>GitHub Actions Gradle Runner</b></p></details>` +
+      `<details open><summary><b>⚙️ Pilih Mode Kompilasi:</b></summary>` +
+      `<p>• <b>🚀 Release APK:</b> Teroptimasi untuk rilis/instalasi final.</p>` +
+      `<p>• <b>⚡ Debug APK:</b> Kompilasi cepat langsung dari template Gradle.</p>` +
+      `</details>` +
       `<tg-button-row>` +
-      `<tg-button type="callback_data" style="success" data="confirm_${buildId}">🚀 Mulai Build APK</tg-button>` +
+      `<tg-button type="callback_data" style="success" data="build_release_${buildId}">🚀 Build Release APK</tg-button>` +
+      `<tg-button type="callback_data" style="primary" data="build_debug_${buildId}">⚡ Build Debug APK</tg-button>` +
+      `</tg-button-row>` +
+      `<tg-button-row>` +
       `<tg-button type="callback_data" style="danger" data="cancel_${buildId}">❌ Batal</tg-button>` +
       `</tg-button-row>`;
 

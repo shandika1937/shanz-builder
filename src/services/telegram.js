@@ -110,10 +110,17 @@ export function createConfirmKeyboard(buildId) {
     inline_keyboard: [
       [
         {
-          text: '🚀 Mulai Build APK',
-          callback_data: `confirm_${buildId}`,
+          text: '🚀 Build Release APK',
+          callback_data: `build_release_${buildId}`,
           style: 'success'
         },
+        {
+          text: '⚡ Build Debug APK',
+          callback_data: `build_debug_${buildId}`,
+          style: 'primary'
+        }
+      ],
+      [
         {
           text: '❌ Batal',
           callback_data: `cancel_${buildId}`,
