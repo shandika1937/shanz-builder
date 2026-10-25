@@ -58,14 +58,17 @@ jobs:
           unzip -q -o payload.zip
           rm -f payload.zip
 
-          if [ ! -f "pubspec.yaml" ]; then
-            SUBDIR=$(find . -maxdepth 2 -name "pubspec.yaml" -exec dirname {} \; | head -n 1)
-            if [ -n "$SUBDIR" ] && [ "$SUBDIR" != "." ]; then
+          PUBSPEC_PATH=$(find . -maxdepth 3 -name "pubspec.yaml" -print -quit)
+          if [ -n "$PUBSPEC_PATH" ]; then
+            SUBDIR=$(dirname "$PUBSPEC_PATH")
+            if [ "$SUBDIR" != "." ]; then
               echo "Moving contents from $SUBDIR to workspace root"
-              cp -r $SUBDIR/* . 2>/dev/null || true
+              cp -a "$SUBDIR"/. .
+              rm -rf "$SUBDIR"
             fi
           fi
-          echo "Files in workspace:"
+
+          echo "Files in workspace root:"
           ls -la
 
           TARGET_MODE="${{ inputs.build_type }}"
@@ -77,6 +80,7 @@ jobs:
       - name: Compile Flutter APK
         working-directory: workspace
         run: |
+          echo "📦 Running flutter pub get..."
           flutter pub get
           if [ "${{ env.TARGET_BUILD_MODE }}" = "debug" ]; then
             echo "⚡ Building Debug APK (Installable on all Android)..."

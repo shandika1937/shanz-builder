@@ -54,6 +54,16 @@ jobs:
           cd workspace
           unzip -q -o payload.zip
           rm -f payload.zip
+
+          SETTINGS_PATH=$(find . -maxdepth 3 -name "settings.gradle" -print -quit)
+          if [ -n "$SETTINGS_PATH" ]; then
+            SUBDIR=$(dirname "$SETTINGS_PATH")
+            if [ "$SUBDIR" != "." ]; then
+              cp -a "$SUBDIR"/. .
+              rm -rf "$SUBDIR"
+            fi
+          fi
+
           ls -la
 
           TARGET_MODE="${{ inputs.build_type }}"
