@@ -43,7 +43,8 @@ const creditManager = new CreditManager({
   adminIds: [config.ownerId, config.coOwnerId]
 });
 
-// Cache user registration
+// Persistent sessions & build storage
+const userSessions = new Map();
 const knownUsers = new Set();
 
 async function checkUserMembership(userId) {
