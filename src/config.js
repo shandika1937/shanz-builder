@@ -36,6 +36,8 @@ export function loadConfig(env = process.env) {
     githubRepo,
     repoOwner,
     repoName,
+    apiId: env.API_ID ? Number(env.API_ID) : 30633789,
+    apiHash: env.API_HASH || '3b93bdf4356597735ba0946ed55294f6',
     tempDir: path.resolve(env.TEMP_DIR || './temp'),
     pollIntervalMs: Number(env.POLL_INTERVAL_MS || 10000),
     maxBuildWaitMs: Number(env.MAX_BUILD_WAIT_MS || 15 * 60 * 1000)

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { loadConfig } from './config.js';
 import {
   TelegramClient,
+  downloadLargeFile,
   createStartKeyboard,
   createBottomRichMenu,
   createCancelKeyboard,
@@ -128,11 +129,11 @@ async function handleMessage(msg) {
     const lowerName = fileName.toLowerCase();
 
     if (lowerName.endsWith('.zip')) {
-      return handleZipUpload(chatId, userId, doc);
+      return handleZipUpload(chatId, userId, doc, msg.message_id);
     }
 
     if (lowerName.endsWith('.html') || lowerName.endsWith('.htm')) {
-      return handleHtmlUpload(chatId, userId, doc);
+      return handleHtmlUpload(chatId, userId, doc, msg.message_id);
     }
 
     return telegram.sendMessage(
@@ -201,15 +202,52 @@ async function handleCallbackQuery(query) {
   }
 }
 
-async function handleZipUpload(chatId, userId, doc) {
+async function handleZipUpload(chatId, userId, doc, messageId) {
   const statusMsg = await telegram.sendMessage(
     chatId,
     `⏳ <b>Mengunduh dan memeriksa proyek ZIP...</b>\nMohon tunggu beberapa detik.`
   );
 
   try {
-    const fileInfo = await telegram.getFile(doc.file_id);
-    const zipBuffer = await telegram.downloadFile(fileInfo.file_path);
+    let zipBuffer;
+    const fileSize = doc.file_size || 0;
+
+    if (fileSize > 20 * 1024 * 1024 && config.apiId && config.apiHash) {
+      await telegram.editMessageText(
+        chatId,
+        statusMsg.message_id,
+        `⏳ <b>Mengunduh file (${(fileSize / (1024 * 1024)).toFixed(1)} MB) via MTProto Cloud...</b>\nMohon tunggu sejenak.`
+      );
+      zipBuffer = await downloadLargeFile(
+        config.apiId,
+        config.apiHash,
+        config.botToken,
+        chatId,
+        messageId
+      );
+    } else {
+      try {
+        const fileInfo = await telegram.getFile(doc.file_id);
+        zipBuffer = await telegram.downloadFile(fileInfo.file_path);
+      } catch (err) {
+        if (err.message.includes('file is too big') && config.apiId && config.apiHash) {
+          await telegram.editMessageText(
+            chatId,
+            statusMsg.message_id,
+            `⏳ <b>File melebihi 20MB, mengalihkan unduhan ke MTProto Cloud...</b>`
+          );
+          zipBuffer = await downloadLargeFile(
+            config.apiId,
+            config.apiHash,
+            config.botToken,
+            chatId,
+            messageId
+          );
+        } else {
+          throw err;
+        }
+      }
+    }
 
     const inspection = await inspectZipProject(zipBuffer);
 
@@ -252,15 +290,42 @@ async function handleZipUpload(chatId, userId, doc) {
   }
 }
 
-async function handleHtmlUpload(chatId, userId, doc) {
+async function handleHtmlUpload(chatId, userId, doc, messageId) {
   const statusMsg = await telegram.sendMessage(
     chatId,
     `⏳ <b>Mengunduh dan menyiapkan paket Android WebView...</b>`
   );
 
   try {
-    const fileInfo = await telegram.getFile(doc.file_id);
-    const htmlBuffer = await telegram.downloadFile(fileInfo.file_path);
+    let htmlBuffer;
+    const fileSize = doc.file_size || 0;
+
+    if (fileSize > 20 * 1024 * 1024 && config.apiId && config.apiHash) {
+      htmlBuffer = await downloadLargeFile(
+        config.apiId,
+        config.apiHash,
+        config.botToken,
+        chatId,
+        messageId
+      );
+    } else {
+      try {
+        const fileInfo = await telegram.getFile(doc.file_id);
+        htmlBuffer = await telegram.downloadFile(fileInfo.file_path);
+      } catch (err) {
+        if (err.message.includes('file is too big') && config.apiId && config.apiHash) {
+          htmlBuffer = await downloadLargeFile(
+            config.apiId,
+            config.apiHash,
+            config.botToken,
+            chatId,
+            messageId
+          );
+        } else {
+          throw err;
+        }
+      }
+    }
 
     const appName = doc.file_name.replace(/\.[^/.]+$/, '') || 'WebToApk App';
     const projectZip = await packageHtmlToAndroidProject(htmlBuffer, { appName });

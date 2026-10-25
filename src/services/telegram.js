@@ -1,3 +1,28 @@
+let mtprotoClient = null;
+
+export async function getMtprotoClient(apiId, apiHash, botToken) {
+  if (mtprotoClient) return mtprotoClient;
+  const { TelegramClient: GramClient } = await import('telegram');
+  const { StringSession } = await import('telegram/sessions/index.js');
+
+  mtprotoClient = new GramClient(new StringSession(''), Number(apiId), apiHash, {
+    connectionRetries: 5
+  });
+  await mtprotoClient.start({ botAuthToken: botToken });
+  return mtprotoClient;
+}
+
+export async function downloadLargeFile(apiId, apiHash, botToken, chatId, messageId, onProgress) {
+  const client = await getMtprotoClient(apiId, apiHash, botToken);
+  const msgs = await client.getMessages(String(chatId), { ids: [Number(messageId)] });
+  if (!msgs || msgs.length === 0 || !msgs[0].media) {
+    throw new Error('Pesan atau berkas media tidak ditemukan di MTProto');
+  }
+  return client.downloadMedia(msgs[0].media, {
+    progressCallback: onProgress
+  });
+}
+
 export function createStartKeyboard() {
   return {
     inline_keyboard: [
