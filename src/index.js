@@ -7,6 +7,7 @@ import {
   makeProgressBar,
   createStartKeyboard,
   createEngineSelectionKeyboard,
+  createJoinGroupKeyboard,
   createRemoveKeyboard,
   createCancelKeyboard,
   createConfirmKeyboard
@@ -42,8 +43,45 @@ const creditManager = new CreditManager({
   adminIds: [config.ownerId, config.coOwnerId]
 });
 
-// Persistent sessions & build storage
-const userSessions = new Map();
+// Cache user registration
+const knownUsers = new Set();
+
+async function checkUserMembership(userId) {
+  if (creditManager.isAdmin(userId)) return true;
+  try {
+    const member = await telegram.call('getChatMember', {
+      chat_id: config.requiredGroupId,
+      user_id: Number(userId)
+    });
+    return ['creator', 'administrator', 'member', 'restricted'].includes(member.status);
+  } catch (err) {
+    console.error(`Check membership error for ${userId}:`, err.message);
+    return false;
+  }
+}
+
+async function notifyGroupLog(htmlMessage) {
+  try {
+    await telegram.sendMessage(config.requiredGroupId, htmlMessage);
+  } catch (err) {
+    console.error('Failed to notify log to group:', err.message);
+  }
+}
+
+function handleNewUserGreeting(from) {
+  const userId = String(from.id);
+  if (!knownUsers.has(userId) && !creditManager.isAdmin(userId)) {
+    knownUsers.add(userId);
+    const username = from.username ? `@${from.username}` : from.first_name || 'User';
+    notifyGroupLog(
+      `🎉 <b>Pelanggan Baru Masuk ke Bot!</b>\n\n` +
+      `👤 <b>Nama:</b> <code>${(from.first_name || '').replace(/[<>&"']/g, '')}</code>\n` +
+      `🆔 <b>ID:</b> <code>${userId}</code>\n` +
+      `🔗 <b>Username:</b> ${username}\n` +
+      `💳 <b>Credit Awal:</b> 3 Credit Gratis`
+    );
+  }
+}
 
 function savePendingBuild(buildId, data) {
   const jsonPath = path.join(config.tempDir, `${buildId}.json`);
@@ -217,7 +255,24 @@ async function handleMessage(msg) {
   }
 
   // Mode Publik: Semua pengguna Telegram dapat mengakses dan mengompilasi APK!
-  // Owner & Co-Owner terdaftar untuk identitas dan hak admin.
+  // Notifikasi new user ke grup log
+  handleNewUserGreeting(msg.from);
+
+  // Wajib Join Grup Resmi sebelum menggunakan bot
+  const isMember = await checkUserMembership(userId);
+  if (!isMember) {
+    return telegram.sendRichMessage(
+      chatId,
+      `<h1>📢 Wajib Bergabung ke Grup Resmi!</h1>` +
+      `<p>Halo <b>${(msg.from.first_name || 'User').replace(/[<>&"']/g, '')}</b>! Untuk dapat menggunakan bot ini secara gratis, kamu <b>wajib bergabung</b> ke grup resmi informasi kami terlebih dahulu:</p>` +
+      `<table bordered compact striped>` +
+      `<tr><th>Grup Wajib</th><th>Status</th></tr>` +
+      `<tr><td>📢 <b>INFO BOT BUILD BY SHANZXGAMERS</b></td><td>🔴 Belum Bergabung</td></tr>` +
+      `</table>` +
+      `<p><i>Silakan klik tombol di bawah untuk join, lalu tekan tombol Verifikasi!</i></p>`,
+      { reply_markup: createJoinGroupKeyboard(config.groupLink) }
+    );
+  }
 
   // Admin commands: /addcredit <userId> <amount> or /setcredit <userId> <amount>
   if (text.startsWith('/addcredit') || text.startsWith('/addcredits')) {
@@ -333,6 +388,22 @@ async function handleCallbackQuery(query) {
   }
 
   await telegram.answerCallbackQuery(query.id);
+
+  if (data === 'check_membership') {
+    const isMember = await checkUserMembership(userId);
+    if (!isMember) {
+      return telegram.sendRichMessage(
+        chatId,
+        `<h1>❌ Belum Bergabung!</h1>` +
+        `<p>Kamu belum terdeteksi di grup <b>@${config.groupUsername}</b>.</p>` +
+        `<p>Silakan join terlebih dahulu melalui tombol di bawah lalu tekan Verifikasi kembali.</p>`,
+        { reply_markup: createJoinGroupKeyboard(config.groupLink) }
+      );
+    }
+    const userCredits = creditManager.getCredits(userId);
+    await telegram.sendMessage(chatId, '✅ <b>Verifikasi Berhasil! Selamat datang di bot.</b>', { reply_markup: createRemoveKeyboard() }).catch(() => {});
+    return handleStart(telegram, chatId, query.from, userCredits);
+  }
 
   if (data === 'select_zip_engine') {
     return sendEngineSelection(chatId, 'zip');
@@ -807,6 +878,16 @@ async function executeBuildVps(chatId, messageId, buildData) {
             `💳 <b>Sisa Credit:</b> <code>${sisaText}</code>\n\n` +
             `👑 <b>Owner:</b> @ShanzRL | 🤝 <b>Co-Owner:</b> @gamersbug`;
 
+          notifyGroupLog(
+            `🚀 <b>Build APK Berhasil Selesai!</b>\n\n` +
+            `👤 <b>User:</b> <code>${buildData.userId}</code>\n` +
+            `📱 <b>Aplikasi:</b> <code>${appName}</code>\n` +
+            `🖥️ <b>Infrastruktur:</b> VPS RexyHost (Dedicated 16GB)\n` +
+            `⚡ <b>Tipe:</b> ${type === 'flutter' ? 'Flutter' : 'WebView'} (${buildMode.toUpperCase()})\n` +
+            `📦 <b>Ukuran:</b> ${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB\n` +
+            `⏱️ <b>Durasi:</b> ${info.elapsedSec || 0} detik`
+          );
+
           if (artifact.fileSize <= 50 * 1024 * 1024) {
             await telegram.sendDocument(chatId, artifact.apkBuffer, artifact.fileName, caption, {
               reply_markup: createStartKeyboard()
@@ -914,6 +995,15 @@ async function executeBuildGitHub(chatId, messageId, buildData) {
     );
 
     const artifact = await github.downloadApkArtifact(completedRun.id);
+
+    notifyGroupLog(
+      `🚀 <b>Build APK Berhasil Selesai!</b>\n\n` +
+      `👤 <b>User:</b> <code>${buildData.userId}</code>\n` +
+      `📱 <b>Aplikasi:</b> <code>${appName}</code>\n` +
+      `☁️ <b>Infrastruktur:</b> GitHub Actions Cloud\n` +
+      `⚡ <b>Tipe:</b> ${type === 'flutter' ? 'Flutter' : 'WebView'} (${buildMode.toUpperCase()})\n` +
+      `📦 <b>Ukuran:</b> ${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB`
+    );
 
     // Potong 1 credit hanya setelah build sukses terkirim
     const consumed = creditManager.consumeCredit(buildData.userId);

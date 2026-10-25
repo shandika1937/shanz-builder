@@ -11,7 +11,7 @@ import {
 test('createStartKeyboard generates inline keyboard with styled buttons and contacts', () => {
   const kb = createStartKeyboard();
   assert.ok(kb.inline_keyboard);
-  assert.equal(kb.inline_keyboard.length, 2);
+  assert.equal(kb.inline_keyboard.length, 3);
 
   const zipBtn = kb.inline_keyboard[0][0];
   assert.equal(zipBtn.style, 'primary');
@@ -28,6 +28,9 @@ test('createStartKeyboard generates inline keyboard with styled buttons and cont
   const creditBtn = kb.inline_keyboard[1][1];
   assert.equal(creditBtn.callback_data, 'check_credits');
   assert.equal(creditBtn.style, 'success');
+
+  const groupBtn = kb.inline_keyboard[2][0];
+  assert.equal(groupBtn.url, 'https://t.me/infobotbuildzip');
 });
 
 test('createRemoveKeyboard generates remove_keyboard object', () => {

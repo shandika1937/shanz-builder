@@ -87,6 +87,26 @@ export function createEngineSelectionKeyboard(fileType) {
   };
 }
 
+export function createJoinGroupKeyboard(groupLink = 'https://t.me/infobotbuildzip') {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: '📢 Join Grup Resmi (Wajib)',
+          url: groupLink
+        }
+      ],
+      [
+        {
+          text: '🔄 Saya Sudah Join (Verifikasi)',
+          callback_data: 'check_membership',
+          style: 'success'
+        }
+      ]
+    ]
+  };
+}
+
 export function createStartKeyboard() {
   return {
     inline_keyboard: [
@@ -112,6 +132,12 @@ export function createStartKeyboard() {
           text: '💳 Sisa Credit',
           callback_data: 'check_credits',
           style: 'success'
+        }
+      ],
+      [
+        {
+          text: '📢 Grup Informasi & Log Build',
+          url: 'https://t.me/infobotbuildzip'
         }
       ]
     ]
