@@ -14,79 +14,77 @@ export class GitHubBuilderService {
   generateBuildId(type, userId) {
     const timestamp = Date.now().toString(36);
     const random = Math.random().toString(36).substring(2, 6);
-    return `build/${type}-${userId}-${timestamp}-${random}`;
+    return `${type}-${userId}-${timestamp}-${random}`;
   }
 
-  async getDefaultBranchSha() {
-    const { data: repoInfo } = await this.octokit.rest.repos.get({
-      owner: this.owner,
-      repo: this.repo
-    });
-    const defaultBranch = repoInfo.default_branch || 'main';
+  async triggerBuild({ buildId, type, buildMode = 'release', appName = 'app', zipBuffer }) {
+    const releaseTag = `build-${buildId}`;
 
-    const { data: refData } = await this.octokit.rest.git.getRef({
+    // 1. Create temporary Release on main
+    const { data: release } = await this.octokit.rest.repos.createRelease({
       owner: this.owner,
       repo: this.repo,
-      ref: `heads/${defaultBranch}`
+      tag_name: releaseTag,
+      name: `Build ${appName} [${buildId}]`,
+      body: `Cloud APK build for ${appName} (${buildMode})`,
+      draft: false,
+      prerelease: true
+    });
+
+    // 2. Upload raw binary payload.zip directly to release (fast & safe)
+    await this.octokit.rest.repos.uploadReleaseAsset({
+      owner: this.owner,
+      repo: this.repo,
+      release_id: release.id,
+      name: 'payload.zip',
+      data: zipBuffer,
+      headers: {
+        'content-type': 'application/zip',
+        'content-length': zipBuffer.length
+      }
+    });
+
+    // 3. Dispatch workflow on main
+    const workflowFile = type === 'flutter' ? 'build-flutter.yml' : 'build-html.yml';
+    await this.octokit.rest.actions.createWorkflowDispatch({
+      owner: this.owner,
+      repo: this.repo,
+      workflow_id: workflowFile,
+      ref: 'main',
+      inputs: {
+        build_id: buildId,
+        release_tag: releaseTag,
+        build_type: buildMode,
+        app_name: appName
+      }
     });
 
     return {
-      sha: refData.object.sha,
-      defaultBranch
-    };
-  }
-
-  async triggerBuild({ branchName, zipBuffer, metadata = {} }) {
-    const { sha: baseSha } = await this.getDefaultBranchSha();
-
-    // 1. Create temporary build branch
-    await this.octokit.rest.git.createRef({
-      owner: this.owner,
-      repo: this.repo,
-      ref: `refs/heads/${branchName}`,
-      sha: baseSha
-    });
-
-    // 2. Upload build metadata (type, appName, version)
-    await this.octokit.rest.repos.createOrUpdateFileContents({
-      owner: this.owner,
-      repo: this.repo,
-      path: 'build-info.json',
-      message: `Setup build metadata [${branchName}]`,
-      content: Buffer.from(JSON.stringify(metadata, null, 2)).toString('base64'),
-      branch: branchName
-    });
-
-    // 3. Upload project payload.zip (triggers GitHub Actions on branch)
-    await this.octokit.rest.repos.createOrUpdateFileContents({
-      owner: this.owner,
-      repo: this.repo,
-      path: 'payload.zip',
-      message: `Trigger Cloud APK Build [${branchName}]`,
-      content: zipBuffer.toString('base64'),
-      branch: branchName
-    });
-
-    return {
-      branchName,
+      releaseId: release.id,
+      releaseTag,
       status: 'triggered'
     };
   }
 
-  async waitForWorkflowRun(branchName, onProgress = () => {}, timeoutMs = 15 * 60 * 1000) {
+  async waitForWorkflowRun({ releaseTag, type }, onProgress = () => {}, timeoutMs = 15 * 60 * 1000) {
     const startTime = Date.now();
     let runId = null;
+    const workflowFile = type === 'flutter' ? 'build-flutter.yml' : 'build-html.yml';
 
     while (Date.now() - startTime < timeoutMs) {
       if (!runId) {
-        const { data } = await this.octokit.rest.actions.listWorkflowRunsForRepo({
+        const { data } = await this.octokit.rest.actions.listWorkflowRuns({
           owner: this.owner,
           repo: this.repo,
-          branch: branchName
+          workflow_id: workflowFile,
+          event: 'workflow_dispatch'
         });
 
         if (data.workflow_runs && data.workflow_runs.length > 0) {
-          runId = data.workflow_runs[0].id;
+          const recentRun = data.workflow_runs.find(r => (Date.now() - new Date(r.created_at).getTime()) < 120000);
+          if (recentRun) {
+            runId = recentRun.id;
+          }
         }
       }
 
@@ -111,7 +109,7 @@ export class GitHubBuilderService {
         }
       }
 
-      await new Promise(resolve => setTimeout(resolve, 8000));
+      await new Promise(resolve => setTimeout(resolve, 6000));
     }
 
     throw new Error('Build timed out after 15 minutes.');
@@ -157,15 +155,24 @@ export class GitHubBuilderService {
     };
   }
 
-  async deleteBuildBranch(branchName) {
-    try {
-      await this.octokit.rest.git.deleteRef({
-        owner: this.owner,
-        repo: this.repo,
-        ref: `heads/${branchName}`
-      });
-    } catch {
-      // Ignore if branch already deleted
+  async cleanupBuild({ releaseId, releaseTag }) {
+    if (releaseId) {
+      try {
+        await this.octokit.rest.repos.deleteRelease({
+          owner: this.owner,
+          repo: this.repo,
+          release_id: releaseId
+        });
+      } catch {}
+    }
+    if (releaseTag) {
+      try {
+        await this.octokit.rest.git.deleteRef({
+          owner: this.owner,
+          repo: this.repo,
+          ref: `tags/${releaseTag}`
+        });
+      } catch {}
     }
   }
 }

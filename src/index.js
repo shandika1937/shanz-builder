@@ -445,12 +445,11 @@ async function handleRawHtmlText(chatId, userId, htmlText) {
 }
 
 async function executeBuild(chatId, messageId, buildData) {
-  const { buildId, type, appName, zipBuffer } = buildData;
-  const branchName = buildId;
+  const { buildId, type, appName, zipBuffer, buildMode = 'release' } = buildData;
 
   const initialHtml = 
     `<h1>🚀 Menyiapkan Kompilasi Cloud...</h1>` +
-    `<p>Aplikasi: <b>${appName}</b> (${type === 'flutter' ? 'Flutter Release' : 'Android WebView'})</p>` +
+    `<p>Aplikasi: <b>${appName}</b> (Mode: <b>${buildMode.toUpperCase()}</b>)</p>` +
     `<pre>[░░░░░░░░░░] 0% (Menyiapkan runner GitHub Actions...)</pre>` +
     `<tg-button-row><tg-button type="callback_data" style="danger" data="cancel_${buildId}">❌ Batalkan Kompilasi</tg-button></tg-button-row>`;
 
@@ -458,22 +457,22 @@ async function executeBuild(chatId, messageId, buildData) {
     reply_markup: createCancelKeyboard(buildId)
   });
 
+  let buildRef = null;
+
   try {
-    // 1. Trigger GitHub Actions build
-    await github.triggerBuild({
-      branchName,
-      zipBuffer,
-      metadata: {
-        buildId,
-        type,
-        appName
-      }
+    // 1. Upload release asset and trigger GitHub Actions build
+    buildRef = await github.triggerBuild({
+      buildId,
+      type,
+      buildMode,
+      appName,
+      zipBuffer
     });
 
     // 2. Poll for workflow run progress
     let lastStatusText = '';
     const completedRun = await github.waitForWorkflowRun(
-      branchName,
+      { releaseTag: buildRef.releaseTag, type },
       async (info) => {
         let estPercent = 10;
         let statusDisplay = 'Menunggu antrean runner...';
@@ -485,7 +484,7 @@ async function executeBuild(chatId, messageId, buildData) {
 
         const progressHtml = 
           `<h1>⚙️ Kompilasi Cloud Berjalan...</h1>` +
-          `<p>Aplikasi: <b>${appName}</b> (${type === 'flutter' ? 'Flutter Release' : 'Android WebView'})</p>` +
+          `<p>Aplikasi: <b>${appName}</b> (${type === 'flutter' ? 'Flutter' : 'Android WebView'} • <b>${buildMode.toUpperCase()}</b>)</p>` +
           `<pre>[${bar}] ${estPercent}% (${info.elapsedSec}s)</pre>` +
           `<details open><summary><b>Status Runner</b></summary><p>• Status: <code>${statusDisplay}</code></p><p>• Engine: <b>GitHub Actions Cloud</b></p></details>` +
           `<tg-button-row><tg-button type="callback_data" style="danger" data="cancel_${buildId}">❌ Batalkan</tg-button></tg-button-row>`;
@@ -503,7 +502,7 @@ async function executeBuild(chatId, messageId, buildData) {
 
     // 3. Handle run completion
     if (completedRun.conclusion !== 'success') {
-      await github.deleteBuildBranch(branchName);
+      await github.cleanupBuild(buildRef);
       return telegram.editRichMessage(
         chatId,
         messageId,
@@ -523,6 +522,7 @@ async function executeBuild(chatId, messageId, buildData) {
 
     const caption = `🎉 <b>APK Berhasil Dibuat!</b>\n\n` +
       `🏷️ <b>Nama File:</b> <code>${artifact.fileName}</code>\n` +
+      `⚡ <b>Mode:</b> ${buildMode.toUpperCase()}\n` +
       `📦 <b>Ukuran:</b> ${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB\n` +
       `👑 <b>Owner:</b> @ShanzRL | 🤝 <b>Co-Owner:</b> @gamersbug`;
 
@@ -533,15 +533,15 @@ async function executeBuild(chatId, messageId, buildData) {
     } else {
       await telegram.sendRichMessage(
         chatId,
-        `<h1>🎉 APK Berhasil Dibuat!</h1><p>🏷️ <b>Berkas:</b> <code>${artifact.fileName}</code> (${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB)</p><p>⚠️ <i>Ukuran melebihi batas 50 MB bot Telegram.</i></p><tg-button-row><tg-button type="url" style="success" url="${artifact.directUrl}">📥 Unduh APK Langsung</tg-button></tg-button-row>`,
+        `<h1>🎉 APK Berhasil Dibuat!</h1><p>🏷️ <b>Berkas:</b> <code>${artifact.fileName}</code> (${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB)</p><p>⚡ <b>Mode:</b> ${buildMode.toUpperCase()}</p><p>⚠️ <i>Ukuran melebihi batas 50 MB bot Telegram.</i></p><tg-button-row><tg-button type="url" style="success" url="${artifact.directUrl}">📥 Unduh APK Langsung</tg-button></tg-button-row>`,
         { reply_markup: createBottomRichMenu() }
       );
     }
 
-    await github.deleteBuildBranch(branchName);
+    await github.cleanupBuild(buildRef);
   } catch (err) {
     console.error(`Build error [${buildId}]:`, err);
-    await github.deleteBuildBranch(branchName);
+    if (buildRef) await github.cleanupBuild(buildRef);
 
     return telegram.editRichMessage(
       chatId,

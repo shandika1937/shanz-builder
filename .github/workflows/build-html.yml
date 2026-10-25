@@ -1,10 +1,25 @@
 name: Build HTML APK
 
 on:
+  workflow_dispatch:
+    inputs:
+      build_id:
+        description: 'Build Identifier'
+        required: true
+      release_tag:
+        description: 'Release Tag with payload.zip'
+        required: true
+      build_type:
+        description: 'release or debug'
+        required: true
+        default: 'release'
+      app_name:
+        description: 'Application Name'
+        required: false
+        default: 'app'
   push:
     branches:
       - 'build/html-**'
-  workflow_dispatch:
 
 jobs:
   build:
@@ -24,21 +39,28 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Unpack Project Payload & Detect Mode
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          BUILD_MODE="release"
-          if [ -f "build-info.json" ]; then
-            PARSED_MODE=$(jq -r '.buildMode // "release"' build-info.json)
-            if [ -n "$PARSED_MODE" ] && [ "$PARSED_MODE" != "null" ]; then
-              BUILD_MODE="$PARSED_MODE"
-            fi
-          fi
-          echo "TARGET_BUILD_MODE=$BUILD_MODE" >> $GITHUB_ENV
-          echo "Selected Build Mode: $BUILD_MODE"
-
           mkdir -p workspace
-          unzip -q -o payload.zip -d workspace
+
+          if [ -n "${{ inputs.release_tag }}" ]; then
+            echo "📥 Downloading payload.zip from release ${{ inputs.release_tag }}..."
+            gh release download "${{ inputs.release_tag }}" --pattern "payload.zip" --dir workspace
+          elif [ -f "payload.zip" ]; then
+            cp payload.zip workspace/
+          fi
+
           cd workspace
+          unzip -q -o payload.zip
+          rm -f payload.zip
           ls -la
+
+          TARGET_MODE="${{ inputs.build_type }}"
+          if [ -z "$TARGET_MODE" ]; then
+            TARGET_MODE="release"
+          fi
+          echo "TARGET_BUILD_MODE=$TARGET_MODE" >> $GITHUB_ENV
 
       - name: Compile WebView APK with Gradle
         working-directory: workspace
