@@ -8,6 +8,10 @@ test('handleStart formats greeting and uses sendRichMessage with styled buttons'
     sendRichMessage: async (chatId, html, options) => {
       sentPayload = { chatId, html, options };
       return { message_id: 100 };
+    },
+    editRichMessage: async (chatId, messageId, html, options) => {
+      sentPayload = { chatId, html, options };
+      return { message_id: messageId };
     }
   };
 

