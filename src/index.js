@@ -14,6 +14,7 @@ import { GitHubBuilderService } from './services/github.js';
 import { inspectZipProject } from './handlers/zipHandler.js';
 import { packageHtmlToAndroidProject } from './handlers/htmlHandler.js';
 import { handleStart } from './handlers/start.js';
+import { CreditManager } from './services/credits.js';
 
 const config = loadConfig();
 const telegram = new TelegramClient(config.botToken);
@@ -27,6 +28,12 @@ const github = new GitHubBuilderService({
 if (!fs.existsSync(config.tempDir)) {
   fs.mkdirSync(config.tempDir, { recursive: true });
 }
+
+const creditManager = new CreditManager({
+  storagePath: path.join(config.tempDir, 'credits.json'),
+  defaultCredits: 3,
+  adminIds: [config.ownerId, config.coOwnerId]
+});
 
 // Persistent sessions & build storage
 const userSessions = new Map();
@@ -62,6 +69,27 @@ console.log('online ready listening connected');
 console.log(`📦 GitHub Target: ${config.githubRepo}`);
 console.log(`👑 Owner: ${config.ownerId} (@ShanzRL)`);
 console.log(`🤝 Co-Owner: ${config.coOwnerId} (@gamersbug)`);
+
+async function sendCreditsInfo(chatId, userId) {
+  const credits = creditManager.getCredits(userId);
+  const statusStr = credits === Infinity ? '♾️ Unlimited (Akses Owner/Admin)' : `${credits} Kali Build Tersisa`;
+  const html = 
+    `<h1>💳 Informasi Kuota Credit</h1>` +
+    `<p>Status akun kamu saat ini:</p>` +
+    `<table bordered compact striped>` +
+    `<tr><th>Pengguna</th><th>Sisa Kuota</th></tr>` +
+    `<tr><td>ID: <code>${userId}</code></td><td><b>${statusStr}</b></td></tr>` +
+    `</table>` +
+    `<details open><summary><b>Ketentuan Kuota:</b></summary>` +
+    `<p>• Setiap pengguna baru otomatis mendapatkan <b>3 Credit Gratis</b>.</p>` +
+    `<p>• 1 Credit digunakan setiap kali berhasil melakukan kompilasi APK.</p>` +
+    `<p>• Hubungi Owner atau Co-Owner jika ingin menambah kuota.</p>` +
+    `</details>` +
+    `<tg-button-row>` +
+    `<tg-button type="url" style="primary" url="https://t.me/ShanzRL">💬 Hubungi Owner</tg-button>` +
+    `</tg-button-row>`;
+  return telegram.sendRichMessage(chatId, html, { reply_markup: createBottomRichMenu() });
+}
 
 async function sendOwnerInfo(chatId) {
   const html = 
@@ -146,10 +174,54 @@ async function handleMessage(msg) {
   // Mode Publik: Semua pengguna Telegram dapat mengakses dan mengompilasi APK!
   // Owner & Co-Owner terdaftar untuk identitas dan hak admin.
 
+  // Admin commands: /addcredit <userId> <amount> or /setcredit <userId> <amount>
+  if (text.startsWith('/addcredit') || text.startsWith('/addcredits')) {
+    if (!creditManager.isAdmin(userId)) {
+      return telegram.sendMessage(chatId, '🚫 Perintah ini khusus untuk Owner dan Co-Owner.');
+    }
+    const parts = text.split(/\s+/);
+    if (parts.length < 3) {
+      return telegram.sendMessage(chatId, '💡 <b>Format Penggunaan:</b>\n<code>/addcredit &lt;target_user_id&gt; &lt;jumlah&gt;</code>\n\nContoh:\n<code>/addcredit 123456789 5</code>');
+    }
+    const targetId = parts[1];
+    const amount = Number(parts[2]);
+    try {
+      const newTotal = creditManager.addCredits(targetId, amount);
+      return telegram.sendRichMessage(
+        chatId,
+        `<h1>✅ Credit Berhasil Ditambahkan!</h1><p>• <b>Target ID:</b> <code>${targetId}</code></p><p>• <b>Jumlah Ditambahkan:</b> +${amount}</p><p>• <b>Total Sekarang:</b> <b>${newTotal} Credit</b></p>`
+      );
+    } catch (err) {
+      return telegram.sendMessage(chatId, `❌ Gagal: ${err.message}`);
+    }
+  }
+
+  if (text.startsWith('/setcredit') || text.startsWith('/setcredits')) {
+    if (!creditManager.isAdmin(userId)) {
+      return telegram.sendMessage(chatId, '🚫 Perintah ini khusus untuk Owner dan Co-Owner.');
+    }
+    const parts = text.split(/\s+/);
+    if (parts.length < 3) {
+      return telegram.sendMessage(chatId, '💡 <b>Format Penggunaan:</b>\n<code>/setcredit &lt;target_user_id&gt; &lt;jumlah&gt;</code>\n\nContoh:\n<code>/setcredit 123456789 10</code>');
+    }
+    const targetId = parts[1];
+    const amount = Number(parts[2]);
+    try {
+      const newTotal = creditManager.setCredits(targetId, amount);
+      return telegram.sendRichMessage(
+        chatId,
+        `<h1>✅ Credit Berhasil Ditetapkan!</h1><p>• <b>Target ID:</b> <code>${targetId}</code></p><p>• <b>Total Credit Baru:</b> <b>${newTotal} Credit</b></p>`
+      );
+    } catch (err) {
+      return telegram.sendMessage(chatId, `❌ Gagal: ${err.message}`);
+    }
+  }
+
   // Start / Help command
   if (text === '/start' || text === '/help') {
     userSessions.set(userId, { mode: 'idle' });
-    return handleStart(telegram, chatId, msg.from);
+    const userCredits = creditManager.getCredits(userId);
+    return handleStart(telegram, chatId, msg.from, userCredits);
   }
 
   // Handle Bottom Keyboard (Rich Menu) actions
@@ -161,6 +233,10 @@ async function handleMessage(msg) {
   if (text === '🌐 Build HTML to APK') {
     userSessions.set(userId, { mode: 'html' });
     return sendHtmlModeInfo(chatId);
+  }
+
+  if (text === '💳 Cek Sisa Credit' || text === '/credit' || text === '/credits') {
+    return sendCreditsInfo(chatId, userId);
   }
 
   if (text.includes('Owner: @ShanzRL') || text === '/owner') {
@@ -221,6 +297,10 @@ async function handleCallbackQuery(query) {
     return sendHtmlModeInfo(chatId);
   }
 
+  if (data === 'check_credits') {
+    return sendCreditsInfo(chatId, userId);
+  }
+
   if (data === 'owner_info') {
     return sendOwnerInfo(chatId);
   }
@@ -239,6 +319,20 @@ async function handleCallbackQuery(query) {
         chatId,
         messageId,
         `⚠️ Sesi build ini sudah kedaluwarsa atau telah diproses. Silakan kirim file kembali.`
+      );
+    }
+
+    const availableCredits = creditManager.getCredits(userId);
+    if (availableCredits <= 0) {
+      return telegram.sendRichMessage(
+        chatId,
+        `<h1>🚫 Kuota Credit Habis!</h1>` +
+        `<p>Mohon maaf, sisa credit kamu <b>0</b>. Setiap akun mendapatkan 3 credit awal gratis.</p>` +
+        `<p>Silakan hubungi Owner atau Co-Owner untuk isi ulang kuota.</p>` +
+        `<tg-button-row>` +
+        `<tg-button type="url" style="primary" url="https://t.me/ShanzRL">💬 Hubungi Owner</tg-button>` +
+        `</tg-button-row>`,
+        { reply_markup: createBottomRichMenu() }
       );
     }
 
@@ -604,10 +698,15 @@ async function executeBuild(chatId, messageId, buildData) {
 
     const artifact = await github.downloadApkArtifact(completedRun.id);
 
+    // Potong 1 credit hanya setelah build sukses terkirim
+    const consumed = creditManager.consumeCredit(buildData.userId);
+    const sisaText = consumed.remaining === Infinity ? '♾️ Unlimited' : `${consumed.remaining} Credit`;
+
     const caption = `🎉 <b>APK Berhasil Dibuat!</b>\n\n` +
       `🏷️ <b>Nama File:</b> <code>${artifact.fileName}</code>\n` +
       `⚡ <b>Mode:</b> ${buildMode.toUpperCase()}\n` +
       `📦 <b>Ukuran:</b> ${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB\n` +
+      `💳 <b>Sisa Credit:</b> <code>${sisaText}</code>\n\n` +
       `👑 <b>Owner:</b> @ShanzRL | 🤝 <b>Co-Owner:</b> @gamersbug`;
 
     if (artifact.fileSize <= 50 * 1024 * 1024) {

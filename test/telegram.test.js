@@ -11,7 +11,7 @@ import {
 test('createStartKeyboard generates inline keyboard with styled buttons and contacts', () => {
   const kb = createStartKeyboard();
   assert.ok(kb.inline_keyboard);
-  assert.equal(kb.inline_keyboard.length, 2);
+  assert.equal(kb.inline_keyboard.length, 3);
 
   const zipBtn = kb.inline_keyboard[0][0];
   assert.equal(zipBtn.style, 'primary');
@@ -21,11 +21,15 @@ test('createStartKeyboard generates inline keyboard with styled buttons and cont
   assert.equal(htmlBtn.style, 'success');
   assert.equal(htmlBtn.callback_data, 'mode_html');
 
-  const ownerBtn = kb.inline_keyboard[1][0];
+  const creditBtn = kb.inline_keyboard[1][0];
+  assert.equal(creditBtn.callback_data, 'check_credits');
+  assert.equal(creditBtn.style, 'primary');
+
+  const ownerBtn = kb.inline_keyboard[2][0];
   assert.equal(ownerBtn.callback_data, 'owner_info');
   assert.equal(ownerBtn.style, 'primary');
 
-  const coOwnerBtn = kb.inline_keyboard[1][1];
+  const coOwnerBtn = kb.inline_keyboard[2][1];
   assert.equal(coOwnerBtn.callback_data, 'coowner_info');
   assert.equal(coOwnerBtn.style, 'success');
 });
@@ -36,7 +40,8 @@ test('createBottomRichMenu generates persistent styled keyboard', () => {
   assert.equal(menu.keyboard[0][0].style, 'primary');
   assert.equal(menu.keyboard[0][1].style, 'success');
   assert.equal(menu.keyboard[1][0].style, 'primary');
-  assert.equal(menu.keyboard[1][1].style, 'success');
+  assert.equal(menu.keyboard[2][0].style, 'primary');
+  assert.equal(menu.keyboard[2][1].style, 'success');
   assert.equal(menu.resize_keyboard, true);
   assert.equal(menu.is_persistent, true);
 });

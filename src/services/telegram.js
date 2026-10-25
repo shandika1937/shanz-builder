@@ -76,6 +76,13 @@ export function createStartKeyboard() {
       ],
       [
         {
+          text: '💳 Cek Sisa Credit',
+          callback_data: 'check_credits',
+          style: 'primary'
+        }
+      ],
+      [
+        {
           text: '👑 Owner: @ShanzRL',
           callback_data: 'owner_info',
           style: 'primary'
@@ -96,6 +103,9 @@ export function createBottomRichMenu() {
       [
         { text: '📦 Build ZIP to APK', style: 'primary' },
         { text: '🌐 Build HTML to APK', style: 'success' }
+      ],
+      [
+        { text: '💳 Cek Sisa Credit', style: 'primary' }
       ],
       [
         { text: '👑 Owner: @ShanzRL', style: 'primary' },
