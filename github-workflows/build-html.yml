@@ -1,0 +1,44 @@
+name: Build HTML APK
+
+on:
+  push:
+    branches:
+      - 'build/html-**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Unpack Project Payload
+        run: |
+          mkdir -p workspace
+          unzip -q -o payload.zip -d workspace
+          cd workspace
+          ls -la
+
+      - name: Compile WebView APK with Gradle
+        working-directory: workspace
+        run: |
+          chmod +x ./gradlew || true
+          ./gradlew assembleRelease || gradle assembleRelease
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: html-webview-apk
+          path: workspace/app/build/outputs/apk/release/*.apk
+          retention-days: 1

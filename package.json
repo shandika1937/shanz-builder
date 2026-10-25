@@ -1,0 +1,16 @@
+{
+  "name": "shanz-builder",
+  "version": "1.0.0",
+  "description": "Telegram Bot Cloud APK Builder for Flutter and HTML projects",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@octokit/rest": "^21.1.1",
+    "adm-zip": "^0.5.16",
+    "dotenv": "^16.4.7"
+  }
+}
