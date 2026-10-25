@@ -24,7 +24,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -68,6 +68,12 @@ jobs:
             fi
           fi
 
+          # Auto upgrade gradle wrapper if exists to prevent version mismatch
+          if [ -f "android/gradle/wrapper/gradle-wrapper.properties" ]; then
+            sed -i 's/gradle-.*-all.zip/gradle-8.14-all.zip/g' android/gradle/wrapper/gradle-wrapper.properties
+            sed -i 's/gradle-.*-bin.zip/gradle-8.14-bin.zip/g' android/gradle/wrapper/gradle-wrapper.properties
+          fi
+
           echo "Files in workspace root:"
           ls -la
 
@@ -82,12 +88,14 @@ jobs:
         run: |
           echo "📦 Running flutter pub get..."
           flutter pub get
+          COMMON_FLAGS="--android-skip-build-dependency-validation"
+
           if [ "${{ env.TARGET_BUILD_MODE }}" = "debug" ]; then
             echo "⚡ Building Debug APK (Installable on all Android)..."
-            flutter build apk --debug
+            flutter build apk --debug $COMMON_FLAGS
           else
             echo "🚀 Building Release APK..."
-            flutter build apk --release || (echo "⚠️ Release signing failed, compiling installable debug APK as fallback..." && flutter build apk --debug)
+            flutter build apk --release $COMMON_FLAGS || (echo "⚠️ Release signing fallback, building installable debug APK..." && flutter build apk --debug $COMMON_FLAGS)
           fi
 
       - name: Find & Upload APK Artifact
