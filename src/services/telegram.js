@@ -1,5 +1,3 @@
-import fs from 'node:fs';
-
 export function createStartKeyboard() {
   return {
     inline_keyboard: [
@@ -8,9 +6,7 @@ export function createStartKeyboard() {
           text: '📦 Build ZIP to APK',
           callback_data: 'mode_zip',
           style: 'primary'
-        }
-      ],
-      [
+        },
         {
           text: '🌐 Build HTML to APK',
           callback_data: 'mode_html',
@@ -20,14 +16,33 @@ export function createStartKeyboard() {
       [
         {
           text: '👑 Owner: @ShanzRL',
-          url: 'https://t.me/ShanzRL'
+          callback_data: 'owner_info',
+          style: 'primary'
         },
         {
           text: '🤝 Co-Owner: @gamersbug',
-          url: 'https://t.me/gamersbug'
+          callback_data: 'coowner_info',
+          style: 'success'
         }
       ]
     ]
+  };
+}
+
+export function createBottomRichMenu() {
+  return {
+    keyboard: [
+      [
+        { text: '📦 Build ZIP to APK', style: 'primary' },
+        { text: '🌐 Build HTML to APK', style: 'success' }
+      ],
+      [
+        { text: '👑 Owner: @ShanzRL', style: 'primary' },
+        { text: '🤝 Co-Owner: @gamersbug', style: 'success' }
+      ]
+    ],
+    resize_keyboard: true,
+    is_persistent: true
   };
 }
 
@@ -85,6 +100,21 @@ export class TelegramClient {
       throw new Error(`Telegram API Error (${method}): ${data.description || 'Unknown error'}`);
     }
     return data.result;
+  }
+
+  async sendRichMessage(chatId, htmlContent, extra = {}) {
+    try {
+      return await this.call('sendRichMessage', {
+        chat_id: chatId,
+        rich_message: {
+          html: htmlContent
+        },
+        ...extra
+      });
+    } catch {
+      // Fallback to standard sendMessage if client doesn't support rich blocks
+      return this.sendMessage(chatId, htmlContent, extra);
+    }
   }
 
   async sendMessage(chatId, text, extra = {}) {

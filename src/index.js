@@ -1,7 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadConfig } from './config.js';
-import { TelegramClient, createStartKeyboard, createCancelKeyboard, createConfirmKeyboard } from './services/telegram.js';
+import {
+  TelegramClient,
+  createStartKeyboard,
+  createBottomRichMenu,
+  createCancelKeyboard,
+  createConfirmKeyboard
+} from './services/telegram.js';
 import { GitHubBuilderService } from './services/github.js';
 import { inspectZipProject } from './handlers/zipHandler.js';
 import { packageHtmlToAndroidProject } from './handlers/htmlHandler.js';
@@ -29,6 +35,50 @@ console.log(`📦 GitHub Target: ${config.githubRepo}`);
 console.log(`👑 Owner: ${config.ownerId} (@ShanzRL)`);
 console.log(`🤝 Co-Owner: ${config.coOwnerId} (@gamersbug)`);
 
+async function sendOwnerInfo(chatId) {
+  const html = 
+    `<h1>👑 Informasi Owner</h1>` +
+    `<p>Owner resmi dan pengembang bot ini:</p>` +
+    `<p>• <b>Username:</b> <a href="https://t.me/ShanzRL">@ShanzRL</a></p>` +
+    `<p>• <b>ID Telegram:</b> <code>8594510495</code></p>` +
+    `<tg-button-row>` +
+    `<tg-button type="url" style="primary" url="https://t.me/ShanzRL">💬 Hubungi @ShanzRL</tg-button>` +
+    `</tg-button-row>`;
+  return telegram.sendRichMessage(chatId, html, { reply_markup: createBottomRichMenu() });
+}
+
+async function sendCoOwnerInfo(chatId) {
+  const html = 
+    `<h1>🤝 Informasi Co-Owner</h1>` +
+    `<p>Co-Owner dan mitra pengembang bot ini:</p>` +
+    `<p>• <b>Username:</b> <a href="https://t.me/gamersbug">@gamersbug</a></p>` +
+    `<p>• <b>ID Telegram:</b> <code>8728564869</code></p>` +
+    `<tg-button-row>` +
+    `<tg-button type="url" style="success" url="https://t.me/gamersbug">💬 Hubungi @gamersbug</tg-button>` +
+    `</tg-button-row>`;
+  return telegram.sendRichMessage(chatId, html, { reply_markup: createBottomRichMenu() });
+}
+
+async function sendZipModeInfo(chatId) {
+  const html = 
+    `<h1>📦 Mode Build ZIP to APK (Flutter)</h1>` +
+    `<p>Silakan kirimkan file <b>.zip</b> proyek Flutter kamu ke chat ini.</p>` +
+    `<details open>` +
+    `<summary><b>Syarat Berkas:</b></summary>` +
+    `<p>1. Memiliki file <code>pubspec.yaml</code></p>` +
+    `<p>2. Memiliki folder <code>lib/</code> dengan kode Dart</p>` +
+    `</details>`;
+  return telegram.sendRichMessage(chatId, html, { reply_markup: createBottomRichMenu() });
+}
+
+async function sendHtmlModeInfo(chatId) {
+  const html = 
+    `<h1>🌐 Mode Build HTML to APK</h1>` +
+    `<p>Silakan kirim file <b>.html</b> kamu ke chat ini, atau tempelkan langsung kode HTML-nya di sini.</p>` +
+    `<p>Bot akan membungkus kode tersebut ke dalam template Android WebView modern!</p>`;
+  return telegram.sendRichMessage(chatId, html, { reply_markup: createBottomRichMenu() });
+}
+
 async function processUpdate(update) {
   try {
     if (update.message) {
@@ -52,6 +102,25 @@ async function handleMessage(msg) {
     return handleStart(telegram, chatId, msg.from);
   }
 
+  // Handle Bottom Keyboard (Rich Menu) actions
+  if (text === '📦 Build ZIP to APK') {
+    userSessions.set(userId, { mode: 'zip' });
+    return sendZipModeInfo(chatId);
+  }
+
+  if (text === '🌐 Build HTML to APK') {
+    userSessions.set(userId, { mode: 'html' });
+    return sendHtmlModeInfo(chatId);
+  }
+
+  if (text.includes('Owner: @ShanzRL') || text === '/owner') {
+    return sendOwnerInfo(chatId);
+  }
+
+  if (text.includes('Co-Owner: @gamersbug') || text === '/coowner') {
+    return sendCoOwnerInfo(chatId);
+  }
+
   // Check document upload
   if (msg.document) {
     const doc = msg.document;
@@ -69,11 +138,11 @@ async function handleMessage(msg) {
     return telegram.sendMessage(
       chatId,
       `⚠️ <b>Format File Tidak Didukung</b>\n\nMohon kirimkan file berekstensi <b>.zip</b> (proyek Flutter) atau <b>.html</b> (web).`,
-      { reply_markup: createStartKeyboard() }
+      { reply_markup: createBottomRichMenu() }
     );
   }
 
-  // If user typed raw HTML text while in html mode or starting with <html> or <!DOCTYPE
+  // If user typed raw HTML text while starting with <html> or <!DOCTYPE
   if (text.startsWith('<!DOCTYPE html') || text.startsWith('<html') || text.includes('</body>')) {
     return handleRawHtmlText(chatId, userId, text);
   }
@@ -89,25 +158,20 @@ async function handleCallbackQuery(query) {
 
   if (data === 'mode_zip') {
     userSessions.set(userId, { mode: 'zip' });
-    return telegram.sendMessage(
-      chatId,
-      `📦 <b>Mode Build ZIP to APK (Flutter) Aktif</b>\n\n` +
-      `Silakan kirimkan file <b>.zip</b> proyek Flutter kamu ke sini.\n\n` +
-      `<i>Kriteria file:</i>\n` +
-      `• Harus ada file <code>pubspec.yaml</code>\n` +
-      `• Harus ada folder <code>lib/</code> dengan kode Dart\n` +
-      `• File akan otomatis dikompilasi ke APK Release di cloud runner.`
-    );
+    return sendZipModeInfo(chatId);
   }
 
   if (data === 'mode_html') {
     userSessions.set(userId, { mode: 'html' });
-    return telegram.sendMessage(
-      chatId,
-      `🌐 <b>Mode Build HTML to APK Aktif</b>\n\n` +
-      `Silakan kirim file <b>.html</b> kamu, atau tempelkan langsung kode HTML-nya di chat ini.\n\n` +
-      `<i>Kode HTML kamu akan ditanamkan ke dalam template Android WebView modern!</i>`
-    );
+    return sendHtmlModeInfo(chatId);
+  }
+
+  if (data === 'owner_info') {
+    return sendOwnerInfo(chatId);
+  }
+
+  if (data === 'coowner_info') {
+    return sendCoOwnerInfo(chatId);
   }
 
   if (data.startsWith('confirm_')) {
@@ -154,7 +218,7 @@ async function handleZipUpload(chatId, userId, doc) {
         chatId,
         statusMsg.message_id,
         `❌ <b>Validasi Proyek Gagal</b>\n\n${inspection.reason}\n\nPastikan ZIP kamu adalah proyek Flutter lengkap.`,
-        { reply_markup: createStartKeyboard() }
+        { reply_markup: createBottomRichMenu() }
       );
     }
 
@@ -329,7 +393,7 @@ async function executeBuild(chatId, messageId, buildData) {
         `Proses kompilasi di runner GitHub Actions gagal dijalankan.\n` +
         `🔍 <a href="${completedRun.html_url}">Lihat Detail Log Error di GitHub</a>\n\n` +
         `Pastikan tidak ada kesalahan sintaks atau dependensi rusak pada kode kamu.`,
-        { reply_markup: createStartKeyboard(), disable_web_page_preview: true }
+        { reply_markup: createBottomRichMenu(), disable_web_page_preview: true }
       );
     }
 
@@ -349,14 +413,14 @@ async function executeBuild(chatId, messageId, buildData) {
 
     if (artifact.fileSize <= 50 * 1024 * 1024) {
       await telegram.sendDocument(chatId, artifact.apkBuffer, artifact.fileName, caption, {
-        reply_markup: createStartKeyboard()
+        reply_markup: createBottomRichMenu()
       });
     } else {
       await telegram.sendMessage(
         chatId,
         `${caption}\n\n⚠️ <i>Ukuran file melebihi 50 MB (batas pengiriman bot Telegram).</i>\n` +
         `🔗 <a href="${artifact.directUrl}">Klik di sini untuk mengunduh APK langsung dari GitHub</a>`,
-        { reply_markup: createStartKeyboard() }
+        { reply_markup: createBottomRichMenu() }
       );
     }
 
@@ -370,7 +434,7 @@ async function executeBuild(chatId, messageId, buildData) {
       chatId,
       messageId,
       `❌ <b>Terjadi Kesalahan:</b> ${err.message}`,
-      { reply_markup: createStartKeyboard() }
+      { reply_markup: createBottomRichMenu() }
     );
   }
 }

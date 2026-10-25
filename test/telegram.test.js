@@ -2,6 +2,7 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import {
   createStartKeyboard,
+  createBottomRichMenu,
   createCancelKeyboard,
   createConfirmKeyboard,
   TelegramClient
@@ -10,21 +11,34 @@ import {
 test('createStartKeyboard generates inline keyboard with styled buttons and contacts', () => {
   const kb = createStartKeyboard();
   assert.ok(kb.inline_keyboard);
-  assert.equal(kb.inline_keyboard.length, 3);
+  assert.equal(kb.inline_keyboard.length, 2);
 
   const zipBtn = kb.inline_keyboard[0][0];
   assert.equal(zipBtn.style, 'primary');
   assert.equal(zipBtn.callback_data, 'mode_zip');
 
-  const htmlBtn = kb.inline_keyboard[1][0];
+  const htmlBtn = kb.inline_keyboard[0][1];
   assert.equal(htmlBtn.style, 'success');
   assert.equal(htmlBtn.callback_data, 'mode_html');
 
-  const ownerBtn = kb.inline_keyboard[2][0];
-  assert.equal(ownerBtn.url, 'https://t.me/ShanzRL');
+  const ownerBtn = kb.inline_keyboard[1][0];
+  assert.equal(ownerBtn.callback_data, 'owner_info');
+  assert.equal(ownerBtn.style, 'primary');
 
-  const coOwnerBtn = kb.inline_keyboard[2][1];
-  assert.equal(coOwnerBtn.url, 'https://t.me/gamersbug');
+  const coOwnerBtn = kb.inline_keyboard[1][1];
+  assert.equal(coOwnerBtn.callback_data, 'coowner_info');
+  assert.equal(coOwnerBtn.style, 'success');
+});
+
+test('createBottomRichMenu generates persistent styled keyboard', () => {
+  const menu = createBottomRichMenu();
+  assert.ok(menu.keyboard);
+  assert.equal(menu.keyboard[0][0].style, 'primary');
+  assert.equal(menu.keyboard[0][1].style, 'success');
+  assert.equal(menu.keyboard[1][0].style, 'primary');
+  assert.equal(menu.keyboard[1][1].style, 'success');
+  assert.equal(menu.resize_keyboard, true);
+  assert.equal(menu.is_persistent, true);
 });
 
 test('createCancelKeyboard generates cancel button with danger style', () => {
