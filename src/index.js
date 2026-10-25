@@ -326,11 +326,9 @@ async function handleMessage(msg) {
   }
 
   // Start / Help command
-  if (text === '/start' || text === '/help') {
+  if (text.startsWith('/start') || text.startsWith('/help')) {
     userSessions.set(userId, { mode: 'idle' });
     const userCredits = creditManager.getCredits(userId);
-    // Hapus keyboard reply lama jika masih ada
-    await telegram.sendMessage(chatId, '✨ Membuka menu APK Builder...', { reply_markup: createRemoveKeyboard() }).catch(() => {});
     return handleStart(telegram, chatId, msg.from, userCredits);
   }
 
@@ -1057,12 +1055,15 @@ let isRunning = true;
 let updateOffset = 0;
 
 async function startPolling() {
+  console.log('📡 Telegram Long Polling started...');
   while (isRunning) {
     try {
       const updates = await telegram.getUpdates(updateOffset, 25);
-      for (const update of updates) {
-        updateOffset = Math.max(updateOffset, update.update_id + 1);
-        await processUpdate(update);
+      if (Array.isArray(updates)) {
+        for (const update of updates) {
+          updateOffset = Math.max(updateOffset, update.update_id + 1);
+          await processUpdate(update);
+        }
       }
     } catch (err) {
       console.error('Polling error:', err.message);
