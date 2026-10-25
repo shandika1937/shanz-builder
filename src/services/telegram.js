@@ -80,40 +80,14 @@ export function createStartKeyboard() {
           callback_data: 'check_credits',
           style: 'primary'
         }
-      ],
-      [
-        {
-          text: '👑 Owner: @ShanzRL',
-          callback_data: 'owner_info',
-          style: 'primary'
-        },
-        {
-          text: '🤝 Co-Owner: @gamersbug',
-          callback_data: 'coowner_info',
-          style: 'success'
-        }
       ]
     ]
   };
 }
 
-export function createBottomRichMenu() {
+export function createRemoveKeyboard() {
   return {
-    keyboard: [
-      [
-        { text: '📦 Build ZIP to APK', style: 'primary' },
-        { text: '🌐 Build HTML to APK', style: 'success' }
-      ],
-      [
-        { text: '💳 Cek Sisa Credit', style: 'primary' }
-      ],
-      [
-        { text: '👑 Owner: @ShanzRL', style: 'primary' },
-        { text: '🤝 Co-Owner: @gamersbug', style: 'success' }
-      ]
-    ],
-    resize_keyboard: true,
-    is_persistent: true
+    remove_keyboard: true
   };
 }
 

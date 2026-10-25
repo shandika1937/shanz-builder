@@ -6,7 +6,7 @@ import {
   downloadLargeFile,
   makeProgressBar,
   createStartKeyboard,
-  createBottomRichMenu,
+  createRemoveKeyboard,
   createCancelKeyboard,
   createConfirmKeyboard
 } from './services/telegram.js';
@@ -88,7 +88,7 @@ async function sendCreditsInfo(chatId, userId) {
     `<tg-button-row>` +
     `<tg-button type="url" style="primary" url="https://t.me/ShanzRL">💬 Hubungi Owner</tg-button>` +
     `</tg-button-row>`;
-  return telegram.sendRichMessage(chatId, html, { reply_markup: createBottomRichMenu() });
+  return telegram.sendRichMessage(chatId, html, { reply_markup: createStartKeyboard() });
 }
 
 async function sendOwnerInfo(chatId) {
@@ -100,7 +100,7 @@ async function sendOwnerInfo(chatId) {
     `<tg-button-row>` +
     `<tg-button type="url" style="primary" url="https://t.me/ShanzRL">💬 Hubungi @ShanzRL</tg-button>` +
     `</tg-button-row>`;
-  return telegram.sendRichMessage(chatId, html, { reply_markup: createBottomRichMenu() });
+  return telegram.sendRichMessage(chatId, html, { reply_markup: createStartKeyboard() });
 }
 
 async function sendCoOwnerInfo(chatId) {
@@ -112,7 +112,7 @@ async function sendCoOwnerInfo(chatId) {
     `<tg-button-row>` +
     `<tg-button type="url" style="success" url="https://t.me/gamersbug">💬 Hubungi @gamersbug</tg-button>` +
     `</tg-button-row>`;
-  return telegram.sendRichMessage(chatId, html, { reply_markup: createBottomRichMenu() });
+  return telegram.sendRichMessage(chatId, html, { reply_markup: createStartKeyboard() });
 }
 
 async function sendZipModeInfo(chatId) {
@@ -124,7 +124,7 @@ async function sendZipModeInfo(chatId) {
     `<p>1. Memiliki file <code>pubspec.yaml</code></p>` +
     `<p>2. Memiliki folder <code>lib/</code> dengan kode Dart</p>` +
     `</details>`;
-  return telegram.sendRichMessage(chatId, html, { reply_markup: createBottomRichMenu() });
+  return telegram.sendRichMessage(chatId, html, { reply_markup: createStartKeyboard() });
 }
 
 async function sendHtmlModeInfo(chatId) {
@@ -132,7 +132,7 @@ async function sendHtmlModeInfo(chatId) {
     `<h1>🌐 Mode Build HTML to APK</h1>` +
     `<p>Silakan kirim file <b>.html</b> kamu ke chat ini, atau tempelkan langsung kode HTML-nya di sini.</p>` +
     `<p>Bot akan membungkus kode tersebut ke dalam template Android WebView modern!</p>`;
-  return telegram.sendRichMessage(chatId, html, { reply_markup: createBottomRichMenu() });
+  return telegram.sendRichMessage(chatId, html, { reply_markup: createStartKeyboard() });
 }
 
 async function processUpdate(update) {
@@ -153,22 +153,17 @@ async function handleMessage(msg) {
   const userId = String(msg.from.id);
   const text = msg.text ? msg.text.trim() : '';
 
-  // Batasi bot hanya aktif di Private Message (PM)
+  // Hapus keyboard menu secara permanen jika pesan berasal dari grup/supergroup
   if (chatType !== 'private') {
-    if (text.startsWith('/start') || text.startsWith('/help') || msg.document) {
-      return telegram.sendMessage(
-        chatId,
-        `⚠️ <b>Bot Ini Hanya Bisa Digunakan di Chat Pribadi (PM)!</b>\n\nSilakan klik tombol di bawah untuk membuka chat langsung dengan bot.`,
-        {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: '💬 Buka Bot di PM', url: 'https://t.me/ZIP2APKBOT?start=start' }]
-            ]
-          }
+    return telegram.sendMessage(
+      chatId,
+      `⚠️ <b>Bot Ini Hanya Bisa Digunakan di Chat Pribadi (PM)!</b>\n\nSilakan klik tombol di bawah untuk membuka chat langsung dengan bot.`,
+      {
+        reply_markup: {
+          remove_keyboard: true
         }
-      );
-    }
-    return;
+      }
+    ).catch(() => {});
   }
 
   // Mode Publik: Semua pengguna Telegram dapat mengakses dan mengompilasi APK!
@@ -221,6 +216,8 @@ async function handleMessage(msg) {
   if (text === '/start' || text === '/help') {
     userSessions.set(userId, { mode: 'idle' });
     const userCredits = creditManager.getCredits(userId);
+    // Hapus keyboard reply lama jika masih ada
+    await telegram.sendMessage(chatId, '✨ Membuka menu APK Builder...', { reply_markup: createRemoveKeyboard() }).catch(() => {});
     return handleStart(telegram, chatId, msg.from, userCredits);
   }
 
@@ -264,7 +261,7 @@ async function handleMessage(msg) {
     return telegram.sendMessage(
       chatId,
       `⚠️ <b>Format File Tidak Didukung</b>\n\nMohon kirimkan file berekstensi <b>.zip</b> (proyek Flutter) atau <b>.html</b> (web).`,
-      { reply_markup: createBottomRichMenu() }
+      { reply_markup: createStartKeyboard() }
     );
   }
 
@@ -332,7 +329,7 @@ async function handleCallbackQuery(query) {
         `<tg-button-row>` +
         `<tg-button type="url" style="primary" url="https://t.me/ShanzRL">💬 Hubungi Owner</tg-button>` +
         `</tg-button-row>`,
-        { reply_markup: createBottomRichMenu() }
+        { reply_markup: createStartKeyboard() }
       );
     }
 
@@ -423,7 +420,7 @@ async function handleZipUpload(chatId, userId, doc, messageId) {
         chatId,
         statusMsg.message_id,
         `<h1>❌ Validasi Proyek Gagal</h1><p>${inspection.reason}</p><p>Pastikan file ZIP memuat proyek Flutter dengan <code>pubspec.yaml</code> dan folder <code>lib/</code>.</p>`,
-        { reply_markup: createBottomRichMenu() }
+        { reply_markup: createStartKeyboard() }
       );
     }
 
@@ -466,7 +463,7 @@ async function handleZipUpload(chatId, userId, doc, messageId) {
       chatId,
       statusMsg.message_id,
       `<h1>❌ Gagal Memproses File ZIP</h1><p>${err.message}</p>`,
-      { reply_markup: createBottomRichMenu() }
+      { reply_markup: createStartKeyboard() }
     );
   }
 }
@@ -560,7 +557,7 @@ async function handleHtmlUpload(chatId, userId, doc, messageId) {
       chatId,
       statusMsg.message_id,
       `<h1>❌ Gagal Menyiapkan File HTML</h1><p>${err.message}</p>`,
-      { reply_markup: createBottomRichMenu() }
+      { reply_markup: createStartKeyboard() }
     );
   }
 }
@@ -615,7 +612,7 @@ async function handleRawHtmlText(chatId, userId, htmlText) {
       chatId,
       statusMsg.message_id,
       `<h1>❌ Gagal Mengemas HTML</h1><p>${err.message}</p>`,
-      { reply_markup: createBottomRichMenu() }
+      { reply_markup: createStartKeyboard() }
     );
   }
 }
@@ -685,7 +682,7 @@ async function executeBuild(chatId, messageId, buildData) {
         chatId,
         messageId,
         `<h1>❌ Kompilasi Gagal!</h1><p>Proses kompilasi di runner GitHub Actions gagal dijalankan.</p><p>🔍 <a href="${completedRun.html_url}">Lihat Detail Log Error di GitHub</a></p><p>Pastikan tidak ada kesalahan sintaks atau dependensi rusak pada kode kamu.</p>`,
-        { reply_markup: createBottomRichMenu() }
+        { reply_markup: createStartKeyboard() }
       );
     }
 
@@ -711,13 +708,13 @@ async function executeBuild(chatId, messageId, buildData) {
 
     if (artifact.fileSize <= 50 * 1024 * 1024) {
       await telegram.sendDocument(chatId, artifact.apkBuffer, artifact.fileName, caption, {
-        reply_markup: createBottomRichMenu()
+        reply_markup: createStartKeyboard()
       });
     } else {
       await telegram.sendRichMessage(
         chatId,
         `<h1>🎉 APK Berhasil Dibuat!</h1><p>🏷️ <b>Berkas:</b> <code>${artifact.fileName}</code> (${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB)</p><p>⚡ <b>Mode:</b> ${buildMode.toUpperCase()}</p><p>⚠️ <i>Ukuran melebihi batas 50 MB bot Telegram.</i></p><tg-button-row><tg-button type="url" style="success" url="${artifact.directUrl}">📥 Unduh APK Langsung</tg-button></tg-button-row>`,
-        { reply_markup: createBottomRichMenu() }
+        { reply_markup: createStartKeyboard() }
       );
     }
 
@@ -732,7 +729,7 @@ async function executeBuild(chatId, messageId, buildData) {
       chatId,
       messageId,
       `<h1>❌ Terjadi Kesalahan</h1><p>${err.message}</p>`,
-      { reply_markup: createBottomRichMenu() }
+      { reply_markup: createStartKeyboard() }
     );
   }
 }

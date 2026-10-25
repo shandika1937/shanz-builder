@@ -11,10 +11,10 @@ test('handleStart formats greeting and uses sendRichMessage with styled buttons'
     }
   };
 
-  const res = await handleStart(mockTelegram, 12345, { first_name: 'Shanz' });
+  const res = await handleStart(mockTelegram, 12345, { first_name: 'Shanz' }, 3);
   assert.equal(res.message_id, 100);
   assert.ok(sentPayload.html.includes('Shanz'));
   assert.ok(sentPayload.html.includes('APK Cloud Builder'));
   assert.ok(sentPayload.html.includes('tg-button'));
-  assert.ok(sentPayload.options.reply_markup.keyboard);
+  assert.ok(sentPayload.options.reply_markup.inline_keyboard);
 });
