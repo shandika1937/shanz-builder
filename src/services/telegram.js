@@ -16,11 +16,11 @@ export async function getMtprotoClient(apiId, apiHash, botToken, sessionStr = ''
 }
 
 export function makeProgressBar(percent) {
-  const total = 10;
+  const total = 12;
   const p = Math.min(100, Math.max(0, percent));
   const filled = Math.round((p / 100) * total);
   const empty = total - filled;
-  return '█'.repeat(filled) + '░'.repeat(empty);
+  return '▰'.repeat(filled) + '▱'.repeat(empty);
 }
 
 export async function downloadLargeFile(apiId, apiHash, botToken, sessionStr, chatId, messageId, outputPath = null, onProgress = () => {}) {

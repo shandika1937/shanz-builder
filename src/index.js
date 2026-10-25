@@ -437,7 +437,7 @@ async function handleCallbackQuery(query) {
 async function handleZipUpload(chatId, userId, doc, messageId) {
   const statusMsg = await telegram.sendRichMessage(
     chatId,
-    `<h1>📥 Mengunduh Berkas ZIP...</h1><pre>[░░░░░░░░░░] 0% (Menghubungkan ke cloud...)</pre><p>⚡ <i>Menggunakan transmisi paralel multi-worker...</i></p>`
+    `<h1>📥 Mengunduh Berkas ZIP...</h1><pre>[▱▱▱▱▱▱▱▱▱▱▱▱] 0% (Menghubungkan ke cloud...)</pre><p>⚡ <i>Menggunakan transmisi paralel multi-worker...</i></p>`
   );
 
   const buildId = github.generateBuildId('flutter', userId);
@@ -495,7 +495,7 @@ async function handleZipUpload(chatId, userId, doc, messageId) {
     await telegram.editRichMessage(
       chatId,
       statusMsg.message_id,
-      `<h1>🔍 Memeriksa Proyek Flutter...</h1><pre>[██████████] 100% (Memvalidasi struktur proyek...)</pre>`
+      `<h1>🔍 Memeriksa Proyek Flutter...</h1><pre>[▰▰▰▰▰▰▰▰▰▰▰▰] 100% (Memvalidasi struktur proyek...)</pre>`
     ).catch(() => {});
 
     const inspection = await inspectZipProject(zipPath);
@@ -730,7 +730,7 @@ async function executeBuildVps(chatId, messageId, buildData) {
   const initialHtml = 
     `<h1>🚀 Menyiapkan Antrean VPS Worker 1...</h1>` +
     `<p>Aplikasi: <b>${appName}</b> (Worker: <b>VPS DO 16GB</b> • <b>${buildMode.toUpperCase()}</b>)</p>` +
-    `<pre>[░░░░░░░░░░] 0% (Mengirimkan payload ke VPS Builder...)</pre>` +
+    `<pre>[▱▱▱▱▱▱▱▱▱▱▱▱] 0% (Mengirimkan payload ke VPS Builder...)</pre>` +
     `<tg-button-row><tg-button type="callback_data" style="danger" data="cancel_${buildId}">❌ Batalkan</tg-button></tg-button-row>`;
 
   await telegram.editRichMessage(chatId, messageId, initialHtml, {
@@ -792,7 +792,7 @@ async function executeBuildVps(chatId, messageId, buildData) {
           await telegram.editRichMessage(
             chatId,
             messageId,
-            `<h1>✅ Kompilasi Selesai!</h1><pre>[██████████] 100%</pre><p>⏳ Mengambil file APK dari VPS dan mengirimkannya...</p>`
+            `<h1>✅ Kompilasi Selesai!</h1><pre>[▰▰▰▰▰▰▰▰▰▰▰▰] 100%</pre><p>⏳ Mengambil file APK dari VPS dan mengirimkannya...</p>`
           );
 
           const artifact = await vps.downloadArtifact(buildId);
@@ -910,7 +910,7 @@ async function executeBuildGitHub(chatId, messageId, buildData) {
     await telegram.editRichMessage(
       chatId,
       messageId,
-      `<h1>✅ Kompilasi Berhasil!</h1><pre>[██████████] 100%</pre><p>⏳ Mengunduh file APK dan mengirimkannya ke chat kamu...</p>`
+      `<h1>✅ Kompilasi Berhasil!</h1><pre>[▰▰▰▰▰▰▰▰▰▰▰▰] 100%</pre><p>⏳ Mengunduh file APK dan mengirimkannya ke chat kamu...</p>`
     );
 
     const artifact = await github.downloadApkArtifact(completedRun.id);

@@ -4,15 +4,17 @@ export async function handleStart(telegram, chatId, user, creditsInfo = null) {
   const name = user?.first_name ? user.first_name.replace(/[<>&"']/g, '') : 'Developer';
 
   const creditText = creditsInfo === Infinity ? '♾️ Unlimited (VIP/Owner)' : `${creditsInfo} Kali Build`;
+  const bannerUrl = 'https://www.image2url.com/r2/default/images/1792928669194-94cc3a69-0c9c-4916-b107-7a293c2a9220.jpg';
 
   const richHtml = 
+    `<img src="${bannerUrl}"/>` +
     `<h1>✨ APK CLOUD BUILDER ✨</h1>` +
     `<p>Halo <b>${name}</b>! Selamat datang di layanan bot kompilasi cloud otomatis untuk mengubah proyek source code <b>Flutter</b> & <b>HTML Web</b> menjadi file <b>APK Android</b> siap instal.</p>` +
     `<table bordered compact striped>` +
     `<tr><th>Informasi Akun</th><th>Keterangan</th></tr>` +
     `<tr><td>👤 Nama User</td><td><b>${name}</b></td></tr>` +
     `<tr><td>💳 Kuota Credit</td><td><code>${creditText}</code></td></tr>` +
-    `<tr><td>⚡ Cloud Engine</td><td><b>GitHub Actions Runner</b></td></tr>` +
+    `<tr><td>⚡ Cloud Engine</td><td><b>Dual-Engine (VPS 16GB + GitHub)</b></td></tr>` +
     `<tr><td>📱 Target OS</td><td><b>Android 5.0 - 14+</b></td></tr>` +
     `</table>` +
     `<details open>` +
