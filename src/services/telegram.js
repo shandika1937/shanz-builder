@@ -23,7 +23,7 @@ export function makeProgressBar(percent) {
   return '█'.repeat(filled) + '░'.repeat(empty);
 }
 
-export async function downloadLargeFile(apiId, apiHash, botToken, sessionStr, chatId, messageId, onProgress = () => {}) {
+export async function downloadLargeFile(apiId, apiHash, botToken, sessionStr, chatId, messageId, outputPath = null, onProgress = () => {}) {
   const client = await getMtprotoClient(apiId, apiHash, botToken, sessionStr);
   const msgs = await client.getMessages(String(chatId), { ids: [Number(messageId)] });
   if (!msgs || msgs.length === 0 || !msgs[0].media) {
@@ -37,7 +37,7 @@ export async function downloadLargeFile(apiId, apiHash, botToken, sessionStr, ch
   const totalBytes = Number(msgs[0].media.document ? msgs[0].media.document.size : 100);
   onProgress(1, totalBytes, 1);
 
-  return client.downloadMedia(msgs[0].media, {
+  const downloadOpts = {
     workers: 4,
     progressCallback: (downloaded, total) => {
       const now = Date.now();
@@ -50,7 +50,13 @@ export async function downloadLargeFile(apiId, apiHash, botToken, sessionStr, ch
         onProgress(d, t, percent);
       }
     }
-  });
+  };
+
+  if (outputPath) {
+    downloadOpts.outputFile = outputPath;
+  }
+
+  return client.downloadMedia(msgs[0].media, downloadOpts);
 }
 
 export function createStartKeyboard() {

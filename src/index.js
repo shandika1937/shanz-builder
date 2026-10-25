@@ -28,9 +28,34 @@ if (!fs.existsSync(config.tempDir)) {
   fs.mkdirSync(config.tempDir, { recursive: true });
 }
 
-// In-memory sessions
+// Persistent sessions & build storage
 const userSessions = new Map();
-const pendingBuilds = new Map();
+
+function savePendingBuild(buildId, data) {
+  const jsonPath = path.join(config.tempDir, `${buildId}.json`);
+  fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2));
+}
+
+function getPendingBuild(buildId) {
+  const jsonPath = path.join(config.tempDir, `${buildId}.json`);
+  if (!fs.existsSync(jsonPath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function deletePendingBuild(buildId) {
+  const jsonPath = path.join(config.tempDir, `${buildId}.json`);
+  const zipPath = path.join(config.tempDir, `${buildId}.zip`);
+  if (fs.existsSync(jsonPath)) {
+    try { fs.unlinkSync(jsonPath); } catch {}
+  }
+  if (fs.existsSync(zipPath)) {
+    try { fs.unlinkSync(zipPath); } catch {}
+  }
+}
 
 console.log('🤖 Starting Shanz APK Cloud Builder Bot...');
 console.log('online ready listening connected');
@@ -199,7 +224,7 @@ async function handleCallbackQuery(query) {
   if (data.startsWith('build_release_') || data.startsWith('build_debug_') || data.startsWith('confirm_')) {
     const isDebug = data.startsWith('build_debug_');
     const buildId = data.replace('build_debug_', '').replace('build_release_', '').replace('confirm_', '');
-    const buildData = pendingBuilds.get(buildId);
+    const buildData = getPendingBuild(buildId);
 
     if (!buildData) {
       return telegram.editMessageText(
@@ -210,13 +235,12 @@ async function handleCallbackQuery(query) {
     }
 
     buildData.buildMode = isDebug ? 'debug' : 'release';
-    pendingBuilds.delete(buildId);
     return executeBuild(chatId, messageId, buildData);
   }
 
   if (data.startsWith('cancel_')) {
     const buildId = data.replace('cancel_', '');
-    pendingBuilds.delete(buildId);
+    deletePendingBuild(buildId);
     return telegram.editMessageText(
       chatId,
       messageId,
@@ -231,18 +255,21 @@ async function handleZipUpload(chatId, userId, doc, messageId) {
     `<h1>📥 Mengunduh Berkas ZIP...</h1><pre>[░░░░░░░░░░] 0% (Menghubungkan ke cloud...)</pre><p>⚡ <i>Menggunakan transmisi paralel multi-worker...</i></p>`
   );
 
+  const buildId = github.generateBuildId('flutter', userId);
+  const zipPath = path.join(config.tempDir, `${buildId}.zip`);
+
   try {
-    let zipBuffer;
     const fileSize = doc.file_size || 0;
 
     if (fileSize > 20 * 1024 * 1024 && config.apiId && config.apiHash) {
-      zipBuffer = await downloadLargeFile(
+      await downloadLargeFile(
         config.apiId,
         config.apiHash,
         config.botToken,
         config.mtprotoSession,
         chatId,
         messageId,
+        zipPath,
         (d, t, pct) => {
           const bar = makeProgressBar(pct);
           const dMb = (d / (1024 * 1024)).toFixed(1);
@@ -254,16 +281,18 @@ async function handleZipUpload(chatId, userId, doc, messageId) {
     } else {
       try {
         const fileInfo = await telegram.getFile(doc.file_id);
-        zipBuffer = await telegram.downloadFile(fileInfo.file_path);
+        const buf = await telegram.downloadFile(fileInfo.file_path);
+        fs.writeFileSync(zipPath, buf);
       } catch (err) {
         if (err.message.includes('file is too big') && config.apiId && config.apiHash) {
-          zipBuffer = await downloadLargeFile(
+          await downloadLargeFile(
             config.apiId,
             config.apiHash,
             config.botToken,
             config.mtprotoSession,
             chatId,
             messageId,
+            zipPath,
             (d, t, pct) => {
               const bar = makeProgressBar(pct);
               const dMb = (d / (1024 * 1024)).toFixed(1);
@@ -278,9 +307,16 @@ async function handleZipUpload(chatId, userId, doc, messageId) {
       }
     }
 
-    const inspection = await inspectZipProject(zipBuffer);
+    await telegram.editRichMessage(
+      chatId,
+      statusMsg.message_id,
+      `<h1>🔍 Memeriksa Proyek Flutter...</h1><pre>[██████████] 100% (Memvalidasi struktur proyek...)</pre>`
+    ).catch(() => {});
+
+    const inspection = await inspectZipProject(zipPath);
 
     if (!inspection.isFlutter) {
+      deletePendingBuild(buildId);
       return telegram.editRichMessage(
         chatId,
         statusMsg.message_id,
@@ -289,14 +325,13 @@ async function handleZipUpload(chatId, userId, doc, messageId) {
       );
     }
 
-    const buildId = github.generateBuildId('flutter', userId);
-    pendingBuilds.set(buildId, {
+    savePendingBuild(buildId, {
       buildId,
       type: 'flutter',
       userId,
       appName: inspection.name,
       version: inspection.version,
-      zipBuffer
+      zipPath
     });
 
     const confirmHtml = 
@@ -324,6 +359,7 @@ async function handleZipUpload(chatId, userId, doc, messageId) {
       reply_markup: createConfirmKeyboard(buildId)
     });
   } catch (err) {
+    deletePendingBuild(buildId);
     return telegram.editRichMessage(
       chatId,
       statusMsg.message_id,
@@ -339,6 +375,9 @@ async function handleHtmlUpload(chatId, userId, doc, messageId) {
     `<h1>📥 Mengunduh Berkas HTML...</h1><pre>[░░░░░░░░░░] 0% (Menyiapkan template Android WebView...)</pre>`
   );
 
+  const buildId = github.generateBuildId('html', userId);
+  const zipPath = path.join(config.tempDir, `${buildId}.zip`);
+
   try {
     let htmlBuffer;
     const fileSize = doc.file_size || 0;
@@ -351,6 +390,7 @@ async function handleHtmlUpload(chatId, userId, doc, messageId) {
         config.mtprotoSession,
         chatId,
         messageId,
+        null,
         (d, t, pct) => {
           const bar = makeProgressBar(pct);
           const html = `<h1>📥 Mengunduh Berkas HTML...</h1><pre>[${bar}] ${pct}%</pre>`;
@@ -379,14 +419,14 @@ async function handleHtmlUpload(chatId, userId, doc, messageId) {
 
     const appName = doc.file_name.replace(/\.[^/.]+$/, '') || 'WebToApk App';
     const projectZip = await packageHtmlToAndroidProject(htmlBuffer, { appName });
+    fs.writeFileSync(zipPath, projectZip);
 
-    const buildId = github.generateBuildId('html', userId);
-    pendingBuilds.set(buildId, {
+    savePendingBuild(buildId, {
       buildId,
       type: 'html',
       userId,
       appName,
-      zipBuffer: projectZip
+      zipPath
     });
 
     const confirmHtml = 
@@ -413,6 +453,7 @@ async function handleHtmlUpload(chatId, userId, doc, messageId) {
       reply_markup: createConfirmKeyboard(buildId)
     });
   } catch (err) {
+    deletePendingBuild(buildId);
     return telegram.editRichMessage(
       chatId,
       statusMsg.message_id,
@@ -428,17 +469,20 @@ async function handleRawHtmlText(chatId, userId, htmlText) {
     `<h1>🌐 Menerima Kode HTML...</h1><pre>Menyiapkan paket WebView...</pre>`
   );
 
+  const buildId = github.generateBuildId('html', userId);
+  const zipPath = path.join(config.tempDir, `${buildId}.zip`);
+
   try {
     const appName = 'Web App';
     const projectZip = await packageHtmlToAndroidProject(htmlText, { appName });
+    fs.writeFileSync(zipPath, projectZip);
 
-    const buildId = github.generateBuildId('html', userId);
-    pendingBuilds.set(buildId, {
+    savePendingBuild(buildId, {
       buildId,
       type: 'html',
       userId,
       appName,
-      zipBuffer: projectZip
+      zipPath
     });
 
     const confirmHtml = 
@@ -448,9 +492,15 @@ async function handleRawHtmlText(chatId, userId, htmlText) {
       `<tr><td>📱 Tipe Target</td><td>Android WebView APK</td></tr>` +
       `<tr><td>🏷️ Nama App</td><td><b>${appName}</b></td></tr>` +
       `</table>` +
-      `<details open><summary><b>⚙️ Target Kompilasi</b></summary><p>• Output: <b>Android Release APK (.apk)</b></p><p>• Cloud: <b>GitHub Actions Gradle Runner</b></p></details>` +
+      `<details open><summary><b>⚙️ Pilih Mode Kompilasi:</b></summary>` +
+      `<p>• <b>🚀 Release APK:</b> Teroptimasi untuk rilis/instalasi final.</p>` +
+      `<p>• <b>⚡ Debug APK:</b> Kompilasi cepat langsung dari template Gradle.</p>` +
+      `</details>` +
       `<tg-button-row>` +
-      `<tg-button type="callback_data" style="success" data="confirm_${buildId}">🚀 Mulai Build APK</tg-button>` +
+      `<tg-button type="callback_data" style="success" data="build_release_${buildId}">🚀 Build Release APK</tg-button>` +
+      `<tg-button type="callback_data" style="primary" data="build_debug_${buildId}">⚡ Build Debug APK</tg-button>` +
+      `</tg-button-row>` +
+      `<tg-button-row>` +
       `<tg-button type="callback_data" style="danger" data="cancel_${buildId}">❌ Batal</tg-button>` +
       `</tg-button-row>`;
 
@@ -458,6 +508,7 @@ async function handleRawHtmlText(chatId, userId, htmlText) {
       reply_markup: createConfirmKeyboard(buildId)
     });
   } catch (err) {
+    deletePendingBuild(buildId);
     return telegram.editRichMessage(
       chatId,
       statusMsg.message_id,
@@ -468,7 +519,116 @@ async function handleRawHtmlText(chatId, userId, htmlText) {
 }
 
 async function executeBuild(chatId, messageId, buildData) {
-  const { buildId, type, appName, zipBuffer, buildMode = 'release' } = buildData;
+  const { buildId, type, appName, zipPath, buildMode = 'release' } = buildData;
+  const zipBuffer = fs.readFileSync(zipPath);
+
+  const initialHtml = 
+    `<h1>🚀 Menyiapkan Kompilasi Cloud...</h1>` +
+    `<p>Aplikasi: <b>${appName}</b> (Mode: <b>${buildMode.toUpperCase()}</b>)</p>` +
+    `<pre>[░░░░░░░░░░] 0% (Menyiapkan runner GitHub Actions...)</pre>` +
+    `<tg-button-row><tg-button type="callback_data" style="danger" data="cancel_${buildId}">❌ Batalkan Kompilasi</tg-button></tg-button-row>`;
+
+  await telegram.editRichMessage(chatId, messageId, initialHtml, {
+    reply_markup: createCancelKeyboard(buildId)
+  });
+
+  let buildRef = null;
+
+  try {
+    // 1. Upload release asset and trigger GitHub Actions build
+    buildRef = await github.triggerBuild({
+      buildId,
+      type,
+      buildMode,
+      appName,
+      zipBuffer
+    });
+
+    // 2. Poll for workflow run progress
+    let lastStatusText = '';
+    const completedRun = await github.waitForWorkflowRun(
+      { releaseTag: buildRef.releaseTag, type },
+      async (info) => {
+        let estPercent = 10;
+        let statusDisplay = 'Menunggu antrean runner...';
+        if (info.status === 'in_progress') {
+          statusDisplay = `Kompilasi APK sedang berjalan (${info.elapsedSec}s)`;
+          estPercent = Math.min(95, 20 + Math.floor((info.elapsedSec / 100) * 75));
+        }
+        const bar = makeProgressBar(estPercent);
+
+        const progressHtml = 
+          `<h1>⚙️ Kompilasi Cloud Berjalan...</h1>` +
+          `<p>Aplikasi: <b>${appName}</b> (${type === 'flutter' ? 'Flutter' : 'Android WebView'} • <b>${buildMode.toUpperCase()}</b>)</p>` +
+          `<pre>[${bar}] ${estPercent}% (${info.elapsedSec}s)</pre>` +
+          `<details open><summary><b>Status Runner</b></summary><p>• Status: <code>${statusDisplay}</code></p><p>• Engine: <b>GitHub Actions Cloud</b></p></details>` +
+          `<tg-button-row><tg-button type="callback_data" style="danger" data="cancel_${buildId}">❌ Batalkan</tg-button></tg-button-row>`;
+
+        if (progressHtml !== lastStatusText) {
+          lastStatusText = progressHtml;
+          try {
+            await telegram.editRichMessage(chatId, messageId, progressHtml, {
+              reply_markup: createCancelKeyboard(buildId)
+            });
+          } catch {}
+        }
+      }
+    );
+
+    // 3. Handle run completion
+    if (completedRun.conclusion !== 'success') {
+      await github.cleanupBuild(buildRef);
+      deletePendingBuild(buildId);
+      return telegram.editRichMessage(
+        chatId,
+        messageId,
+        `<h1>❌ Kompilasi Gagal!</h1><p>Proses kompilasi di runner GitHub Actions gagal dijalankan.</p><p>🔍 <a href="${completedRun.html_url}">Lihat Detail Log Error di GitHub</a></p><p>Pastikan tidak ada kesalahan sintaks atau dependensi rusak pada kode kamu.</p>`,
+        { reply_markup: createBottomRichMenu() }
+      );
+    }
+
+    // 4. Download and send APK
+    await telegram.editRichMessage(
+      chatId,
+      messageId,
+      `<h1>✅ Kompilasi Berhasil!</h1><pre>[██████████] 100%</pre><p>⏳ Mengunduh file APK dan mengirimkannya ke chat kamu...</p>`
+    );
+
+    const artifact = await github.downloadApkArtifact(completedRun.id);
+
+    const caption = `🎉 <b>APK Berhasil Dibuat!</b>\n\n` +
+      `🏷️ <b>Nama File:</b> <code>${artifact.fileName}</code>\n` +
+      `⚡ <b>Mode:</b> ${buildMode.toUpperCase()}\n` +
+      `📦 <b>Ukuran:</b> ${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB\n` +
+      `👑 <b>Owner:</b> @ShanzRL | 🤝 <b>Co-Owner:</b> @gamersbug`;
+
+    if (artifact.fileSize <= 50 * 1024 * 1024) {
+      await telegram.sendDocument(chatId, artifact.apkBuffer, artifact.fileName, caption, {
+        reply_markup: createBottomRichMenu()
+      });
+    } else {
+      await telegram.sendRichMessage(
+        chatId,
+        `<h1>🎉 APK Berhasil Dibuat!</h1><p>🏷️ <b>Berkas:</b> <code>${artifact.fileName}</code> (${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB)</p><p>⚡ <b>Mode:</b> ${buildMode.toUpperCase()}</p><p>⚠️ <i>Ukuran melebihi batas 50 MB bot Telegram.</i></p><tg-button-row><tg-button type="url" style="success" url="${artifact.directUrl}">📥 Unduh APK Langsung</tg-button></tg-button-row>`,
+        { reply_markup: createBottomRichMenu() }
+      );
+    }
+
+    await github.cleanupBuild(buildRef);
+    deletePendingBuild(buildId);
+  } catch (err) {
+    console.error(`Build error [${buildId}]:`, err);
+    if (buildRef) await github.cleanupBuild(buildRef);
+    deletePendingBuild(buildId);
+
+    return telegram.editRichMessage(
+      chatId,
+      messageId,
+      `<h1>❌ Terjadi Kesalahan</h1><p>${err.message}</p>`,
+      { reply_markup: createBottomRichMenu() }
+    );
+  }
+}
 
   const initialHtml = 
     `<h1>🚀 Menyiapkan Kompilasi Cloud...</h1>` +
