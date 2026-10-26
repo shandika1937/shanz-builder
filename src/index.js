@@ -10,7 +10,8 @@ import {
   createJoinGroupKeyboard,
   createRemoveKeyboard,
   createCancelKeyboard,
-  createConfirmKeyboard
+  createConfirmKeyboard,
+  createGroupBuildAnnouncementKeyboard
 } from './services/telegram.js';
 import { GitHubBuilderService } from './services/github.js';
 import { VpsBuilderService } from './services/vps.js';
@@ -62,9 +63,10 @@ async function checkUserMembership(userId) {
   }
 }
 
-async function notifyGroupLog(htmlMessage) {
+async function notifyGroupLog(htmlMessage, replyMarkup = null) {
   try {
-    await telegram.sendMessage(config.requiredGroupId, htmlMessage);
+    const extra = replyMarkup ? { reply_markup: replyMarkup } : {};
+    await telegram.sendMessage(config.requiredGroupId, htmlMessage, extra);
   } catch (err) {
     console.error('Failed to notify log to group:', err.message);
   }
@@ -900,7 +902,8 @@ async function executeBuildVps(chatId, messageId, buildData) {
             `🖥️ <b>Infrastruktur:</b> VPS RexyHost (Dedicated 16GB)\n` +
             `⚡ <b>Tipe:</b> ${type === 'flutter' ? 'Flutter' : 'WebView'} (${buildMode.toUpperCase()})\n` +
             `📦 <b>Ukuran:</b> ${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB\n` +
-            `⏱️ <b>Durasi:</b> ${info.elapsedSec || 0} detik`
+            `⏱️ <b>Durasi:</b> ${info.elapsedSec || 0} detik`,
+            createGroupBuildAnnouncementKeyboard()
           );
 
           if (artifact.fileSize <= 50 * 1024 * 1024) {
@@ -1017,7 +1020,8 @@ async function executeBuildGitHub(chatId, messageId, buildData) {
       `📱 <b>Aplikasi:</b> <code>${appName}</code>\n` +
       `☁️ <b>Infrastruktur:</b> GitHub Actions Cloud\n` +
       `⚡ <b>Tipe:</b> ${type === 'flutter' ? 'Flutter' : 'WebView'} (${buildMode.toUpperCase()})\n` +
-      `📦 <b>Ukuran:</b> ${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB`
+      `📦 <b>Ukuran:</b> ${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB`,
+      createGroupBuildAnnouncementKeyboard()
     );
 
     // Potong 1 credit hanya setelah build sukses terkirim

@@ -153,6 +153,19 @@ export function createStartKeyboard() {
   };
 }
 
+export function createGroupBuildAnnouncementKeyboard(botUsername = 'ZIP2APKBOT') {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: '🚀 Mau Build Juga? Gas Build!',
+          url: `https://t.me/${botUsername}?start=start`
+        }
+      ]
+    ]
+  };
+}
+
 export function createRemoveKeyboard() {
   return {
     remove_keyboard: true
@@ -164,7 +177,7 @@ export function createCancelKeyboard(buildId) {
     inline_keyboard: [
       [
         {
-          text: '❌ Batalkan Kompilasi',
+          text: '❌ Batalkan',
           callback_data: `cancel_${buildId}`,
           style: 'danger'
         }
@@ -178,19 +191,19 @@ export function createConfirmKeyboard(buildId) {
     inline_keyboard: [
       [
         {
-          text: '🚀 Build Release APK',
+          text: '🚀 Release',
           callback_data: `build_release_${buildId}`,
           style: 'success'
         },
         {
-          text: '⚡ Build Debug APK',
+          text: '⚡ Debug',
           callback_data: `build_debug_${buildId}`,
           style: 'primary'
         }
       ],
       [
         {
-          text: '❌ Batal',
+          text: '❌ Batalkan',
           callback_data: `cancel_${buildId}`,
           style: 'danger'
         }
