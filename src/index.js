@@ -12,6 +12,7 @@ import {
   createRemoveKeyboard,
   createCancelKeyboard,
   createConfirmKeyboard,
+  createGroupNewMemberKeyboard,
   createGroupBuildAnnouncementKeyboard
 } from './services/telegram.js';
 import { GitHubBuilderService } from './services/github.js';
@@ -73,18 +74,56 @@ async function notifyGroupLog(htmlMessage, replyMarkup = null) {
   }
 }
 
+function getWibDateTime() {
+  const now = new Date();
+  // UTC + 7 jam untuk WIB
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const wib = new Date(utc + (3600000 * 7));
+
+  const pad = (n) => String(n).padStart(2, '0');
+  const d = pad(wib.getDate());
+  const m = pad(wib.getMonth() + 1);
+  const y = wib.getFullYear();
+  const dateStr = `${d}/${m}/${y}`;
+
+  const hr = pad(wib.getHours());
+  const min = pad(wib.getMinutes());
+  const sec = pad(wib.getSeconds());
+  const timeStr = `${hr}.${min}.${sec} WIB`;
+
+  return { dateStr, timeStr };
+}
+
 function handleNewUserGreeting(from) {
   const userId = String(from.id);
   if (!knownUsers.has(userId) && !creditManager.isAdmin(userId)) {
     knownUsers.add(userId);
-    const username = from.username ? `@${from.username}` : from.first_name || 'User';
-    notifyGroupLog(
-      `🎉 <b>Pelanggan Baru Masuk ke Bot!</b>\n\n` +
-      `👤 <b>Nama:</b> <code>${(from.first_name || '').replace(/[<>&"']/g, '')}</code>\n` +
-      `🆔 <b>ID:</b> <code>${userId}</code>\n` +
-      `🔗 <b>Username:</b> ${username}\n` +
-      `💳 <b>Credit Awal:</b> 3 Credit Gratis`
-    );
+    const firstName = (from.first_name || 'User').replace(/[<>&"']/g, '');
+    const username = from.username ? `@${from.username}` : 'Tidak ada username';
+    const totalUsers = creditManager.getTotalUsers() || 1;
+    const { dateStr, timeStr } = getWibDateTime();
+
+    const logHtml = 
+      `<b>BUILD SHANZXGAMERS</b>\n` +
+      `<b>NOTIFICATION CENTER</b>\n\n` +
+      `• <b>NEW MEMBER</b>\n` +
+      `<i>Member baru terverifikasi di bot build ShanzXGamers</i>\n\n` +
+      `• <b>MEMBER BARU | Lolos required-join dan resmi terdaftar di sistem BOT BUILD SHANZXGAMERS.</b>\n\n` +
+      `Nama : <b>${firstName}</b>\n` +
+      `Username : ${username}\n` +
+      `User ID : <code>${userId}</code>\n\n` +
+      `<b>Aktivitas Akun</b>\n` +
+      `- Status : <b>FREE (3 Credit)</b>\n` +
+      `- Bergabung : ${dateStr}\n` +
+      `- Waktu : ${timeStr}\n` +
+      `- User terdaftar : <b>${totalUsers} user</b>\n\n` +
+      `✅ <b>Lolos required-join</b>\n` +
+      `✅ <b>Resmi terdaftar di BUILD SHANZXGAMERS</b>\n` +
+      `✅ <b>Akun aktif, siap Build APK</b>\n\n` +
+      `<i>Akun sudah aktif dan siap dipakai. Tinggal buka bot lalu pilih Mulai Build APK.</i>\n\n` +
+      `• <b>BOT SHANZXGAMERS • Selamat datang di keluarga BUILD SHANZXGAMERS • BY @ShanzRL & @gamersbug</b>`;
+
+    notifyGroupLog(logHtml, createGroupNewMemberKeyboard(userId));
   }
 }
 
@@ -883,14 +922,28 @@ async function executeBuildVps(chatId, messageId, buildData) {
             `💳 <b>Sisa Credit:</b> <code>${sisaText}</code>\n\n` +
             `👑 <b>Owner:</b> @ShanzRL | 🤝 <b>Co-Owner:</b> @gamersbug`;
 
+          const { dateStr, timeStr } = getWibDateTime();
+          const buildAnnouncement = 
+            `<b>BUILD SHANZXGAMERS</b>\n` +
+            `<b>NOTIFICATION CENTER</b>\n\n` +
+            `• <b>BUILD SUCCESSFUL</b>\n` +
+            `<i>Aplikasi berhasil dikompilasi menjadi APK Android</i>\n\n` +
+            `• <b>STATUS SELESAI | File APK berhasil dibuat dan telah dikirim ke pengguna.</b>\n\n` +
+            `Aplikasi : <b>${appName}</b>\n` +
+            `File APK : <code>${artifact.fileName}</code>\n` +
+            `User ID : <code>${buildData.userId}</code>\n\n` +
+            `<b>Rincian Kompilasi</b>\n` +
+            `- Node Builder : <b>VPS RexyHost (Dedicated 16GB)</b>\n` +
+            `- Mode : <b>${buildMode.toUpperCase()}</b> (${type === 'flutter' ? 'Flutter' : 'WebView'})\n` +
+            `- Ukuran APK : <b>${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB</b>\n` +
+            `- Waktu Selesai : ${timeStr} | ${dateStr}\n` +
+            `- Durasi Build : <b>${info.elapsedSec || 0} detik</b>\n\n` +
+            `✅ <b>Kompilasi Sukses</b>\n` +
+            `✅ <b>Siap Diinstall di Android</b>\n\n` +
+            `• <b>BOT SHANZXGAMERS • BY @ShanzRL & @gamersbug</b>`;
+
           notifyGroupLog(
-            `🚀 <b>Build APK Berhasil Selesai!</b>\n\n` +
-            `👤 <b>User:</b> <code>${buildData.userId}</code>\n` +
-            `📱 <b>Aplikasi:</b> <code>${appName}</code>\n` +
-            `🖥️ <b>Infrastruktur:</b> VPS RexyHost (Dedicated 16GB)\n` +
-            `⚡ <b>Tipe:</b> ${type === 'flutter' ? 'Flutter' : 'WebView'} (${buildMode.toUpperCase()})\n` +
-            `📦 <b>Ukuran:</b> ${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB\n` +
-            `⏱️ <b>Durasi:</b> ${info.elapsedSec || 0} detik`,
+            buildAnnouncement,
             createGroupBuildAnnouncementKeyboard()
           );
 
@@ -1002,13 +1055,27 @@ async function executeBuildGitHub(chatId, messageId, buildData) {
 
     const artifact = await github.downloadApkArtifact(completedRun.id);
 
+    const { dateStr, timeStr } = getWibDateTime();
+    const buildAnnouncement = 
+      `<b>BUILD SHANZXGAMERS</b>\n` +
+      `<b>NOTIFICATION CENTER</b>\n\n` +
+      `• <b>BUILD SUCCESSFUL</b>\n` +
+      `<i>Aplikasi berhasil dikompilasi menjadi APK Android</i>\n\n` +
+      `• <b>STATUS SELESAI | File APK berhasil dibuat dan telah dikirim ke pengguna.</b>\n\n` +
+      `Aplikasi : <b>${appName}</b>\n` +
+      `File APK : <code>${artifact.fileName}</code>\n` +
+      `User ID : <code>${buildData.userId}</code>\n\n` +
+      `<b>Rincian Kompilasi</b>\n` +
+      `- Node Builder : <b>GitHub Actions Cloud</b>\n` +
+      `- Mode : <b>${buildMode.toUpperCase()}</b> (${type === 'flutter' ? 'Flutter' : 'WebView'})\n` +
+      `- Ukuran APK : <b>${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB</b>\n` +
+      `- Waktu Selesai : ${timeStr} | ${dateStr}\n\n` +
+      `✅ <b>Kompilasi Sukses</b>\n` +
+      `✅ <b>Siap Diinstall di Android</b>\n\n` +
+      `• <b>BOT SHANZXGAMERS • BY @ShanzRL & @gamersbug</b>`;
+
     notifyGroupLog(
-      `🚀 <b>Build APK Berhasil Selesai!</b>\n\n` +
-      `👤 <b>User:</b> <code>${buildData.userId}</code>\n` +
-      `📱 <b>Aplikasi:</b> <code>${appName}</code>\n` +
-      `☁️ <b>Infrastruktur:</b> GitHub Actions Cloud\n` +
-      `⚡ <b>Tipe:</b> ${type === 'flutter' ? 'Flutter' : 'WebView'} (${buildMode.toUpperCase()})\n` +
-      `📦 <b>Ukuran:</b> ${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB`,
+      buildAnnouncement,
       createGroupBuildAnnouncementKeyboard()
     );
 

@@ -128,7 +128,7 @@ export function createJoinGroupKeyboard(groupLink = 'https://t.me/infobotbuildzi
         {
           text: '🔄 Saya Sudah Join (Verifikasi)',
           callback_data: 'check_membership',
-          style: 'success'
+          style: 'primary'
         }
       ]
     ]
@@ -183,6 +183,29 @@ export function createStartKeyboard() {
   };
 }
 
+export function createGroupNewMemberKeyboard(userId, botUsername = 'ZIP2APKBOT') {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: '🤖 BUKA BOT',
+          url: `https://t.me/${botUsername}?start=start`
+        },
+        {
+          text: '👤 LIHAT USER',
+          url: `tg://user?id=${userId}`
+        }
+      ],
+      [
+        {
+          text: '👑 DEVELOPER',
+          url: 'https://t.me/ShanzRL'
+        }
+      ]
+    ]
+  };
+}
+
 export function createGroupBuildAnnouncementKeyboard(botUsername = 'ZIP2APKBOT') {
   return {
     inline_keyboard: [
@@ -190,6 +213,12 @@ export function createGroupBuildAnnouncementKeyboard(botUsername = 'ZIP2APKBOT')
         {
           text: '🚀 Mau Build Juga? Gas Build!',
           url: `https://t.me/${botUsername}?start=start`
+        }
+      ],
+      [
+        {
+          text: '👑 DEVELOPER',
+          url: 'https://t.me/ShanzRL'
         }
       ]
     ]
