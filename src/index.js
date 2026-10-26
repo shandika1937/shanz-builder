@@ -74,6 +74,19 @@ async function notifyGroupLog(htmlMessage, replyMarkup = null) {
   }
 }
 
+async function notifyGroupRichLog(richHtml) {
+  try {
+    await telegram.call('sendRichMessage', {
+      chat_id: config.requiredGroupId,
+      rich_message: {
+        html: richHtml
+      }
+    });
+  } catch (err) {
+    console.error('Failed to send rich log to group:', err.message);
+  }
+}
+
 function getWibDateTime() {
   const now = new Date();
   // UTC + 7 jam untuk WIB
@@ -103,27 +116,36 @@ function handleNewUserGreeting(from) {
     const totalUsers = creditManager.getTotalUsers() || 1;
     const { dateStr, timeStr } = getWibDateTime();
 
-    const logHtml = 
-      `<b>BUILD SHANZXGAMERS</b>\n` +
-      `<b>NOTIFICATION CENTER</b>\n\n` +
-      `• <b>NEW MEMBER</b>\n` +
-      `<i>Member baru terverifikasi di bot build ShanzXGamers</i>\n\n` +
-      `• <b>MEMBER BARU | Lolos required-join dan resmi terdaftar di sistem BOT BUILD SHANZXGAMERS.</b>\n\n` +
-      `Nama : <b>${firstName}</b>\n` +
-      `Username : ${username}\n` +
-      `User ID : <code>${userId}</code>\n\n` +
-      `<b>Aktivitas Akun</b>\n` +
-      `- Status : <b>FREE (3 Credit)</b>\n` +
-      `- Bergabung : ${dateStr}\n` +
-      `- Waktu : ${timeStr}\n` +
-      `- User terdaftar : <b>${totalUsers} user</b>\n\n` +
-      `✅ <b>Lolos required-join</b>\n` +
-      `✅ <b>Resmi terdaftar di BUILD SHANZXGAMERS</b>\n` +
-      `✅ <b>Akun aktif, siap Build APK</b>\n\n` +
-      `<i>Akun sudah aktif dan siap dipakai. Tinggal buka bot lalu pilih Mulai Build APK.</i>\n\n` +
-      `• <b>BOT SHANZXGAMERS • Selamat datang di keluarga BUILD SHANZXGAMERS • BY @ShanzRL & @gamersbug</b>`;
+    const richHtml = 
+      `<h1>BUILD SHANZXGAMERS</h1>` +
+      `<p><b>NOTIFICATION CENTER</b></p>` +
+      `<p>• <b>NEW MEMBER</b><br/><i>Member baru terverifikasi di bot build ShanzXGamers</i></p>` +
+      `<blockquote>• <b>MEMBER BARU</b> | Lolos required-join dan resmi terdaftar di sistem BOT BUILD SHANZXGAMERS.</blockquote>` +
+      `<table bordered compact striped>` +
+      `<tr><th>Informasi</th><th>Data Member</th></tr>` +
+      `<tr><td>Nama</td><td><b>${firstName}</b></td></tr>` +
+      `<tr><td>Username</td><td>${username}</td></tr>` +
+      `<tr><td>User ID</td><td><code>${userId}</code></td></tr>` +
+      `</table>` +
+      `<details open><summary><b>Aktivitas Akun</b></summary>` +
+      `<p>• Status : <b>FREE (3 Credit)</b><br/>` +
+      `• Bergabung : <b>${dateStr}</b><br/>` +
+      `• Waktu : <b>${timeStr}</b><br/>` +
+      `• User terdaftar : <b>${totalUsers} user</b></p>` +
+      `</details>` +
+      `<blockquote>✅ <b>Lolos required-join</b><br/>✅ <b>Resmi terdaftar di BUILD SHANZXGAMERS</b><br/>✅ <b>Akun aktif, siap Build APK</b></blockquote>` +
+      `<p><i>Akun sudah aktif dan siap dipakai. Tinggal buka bot lalu pilih Mulai Build APK.</i></p>` +
+      `<hr/>` +
+      `<p>• <b>BOT SHANZXGAMERS • Selamat datang di keluarga BUILD SHANZXGAMERS • BY @ShanzRL & @gamersbug</b></p>` +
+      `<tg-button-row>` +
+      `<tg-button type="url" style="primary" url="https://t.me/ZIP2APKBOT?start=start">🤖 BUKA BOT</tg-button>` +
+      `<tg-button type="url" style="primary" url="tg://user?id=${userId}">👤 LIHAT USER</tg-button>` +
+      `</tg-button-row>` +
+      `<tg-button-row>` +
+      `<tg-button type="url" style="success" url="https://t.me/ShanzRL">👑 DEVELOPER</tg-button>` +
+      `</tg-button-row>`;
 
-    notifyGroupLog(logHtml, createGroupNewMemberKeyboard(userId));
+    notifyGroupRichLog(richHtml);
   }
 }
 
@@ -923,29 +945,33 @@ async function executeBuildVps(chatId, messageId, buildData) {
             `👑 <b>Owner:</b> @ShanzRL | 🤝 <b>Co-Owner:</b> @gamersbug`;
 
           const { dateStr, timeStr } = getWibDateTime();
-          const buildAnnouncement = 
-            `<b>BUILD SHANZXGAMERS</b>\n` +
-            `<b>NOTIFICATION CENTER</b>\n\n` +
-            `• <b>BUILD SUCCESSFUL</b>\n` +
-            `<i>Aplikasi berhasil dikompilasi menjadi APK Android</i>\n\n` +
-            `• <b>STATUS SELESAI | File APK berhasil dibuat dan telah dikirim ke pengguna.</b>\n\n` +
-            `Aplikasi : <b>${appName}</b>\n` +
-            `File APK : <code>${artifact.fileName}</code>\n` +
-            `User ID : <code>${buildData.userId}</code>\n\n` +
-            `<b>Rincian Kompilasi</b>\n` +
-            `- Node Builder : <b>VPS RexyHost (Dedicated 16GB)</b>\n` +
-            `- Mode : <b>${buildMode.toUpperCase()}</b> (${type === 'flutter' ? 'Flutter' : 'WebView'})\n` +
-            `- Ukuran APK : <b>${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB</b>\n` +
-            `- Waktu Selesai : ${timeStr} | ${dateStr}\n` +
-            `- Durasi Build : <b>${info.elapsedSec || 0} detik</b>\n\n` +
-            `✅ <b>Kompilasi Sukses</b>\n` +
-            `✅ <b>Siap Diinstall di Android</b>\n\n` +
-            `• <b>BOT SHANZXGAMERS • BY @ShanzRL & @gamersbug</b>`;
+          const richBuildAnnouncement = 
+            `<h1>BUILD SHANZXGAMERS</h1>` +
+            `<p><b>NOTIFICATION CENTER</b></p>` +
+            `<p>• <b>BUILD SUCCESSFUL</b><br/><i>Aplikasi berhasil dikompilasi menjadi APK Android</i></p>` +
+            `<blockquote>• <b>STATUS SELESAI</b> | File APK berhasil dibuat dan telah dikirim ke pengguna.</blockquote>` +
+            `<table bordered compact striped>` +
+            `<tr><th>Informasi</th><th>Rincian Aplikasi</th></tr>` +
+            `<tr><td>Aplikasi</td><td><b>${appName}</b></td></tr>` +
+            `<tr><td>File APK</td><td><code>${artifact.fileName}</code></td></tr>` +
+            `<tr><td>User ID</td><td><code>${buildData.userId}</code></td></tr>` +
+            `</table>` +
+            `<details open><summary><b>Rincian Kompilasi</b></summary>` +
+            `<p>• Node Builder : <b>VPS RexyHost (Dedicated 16GB)</b><br/>` +
+            `• Mode : <b>${buildMode.toUpperCase()} (${type === 'flutter' ? 'Flutter' : 'WebView'})</b><br/>` +
+            `• Ukuran APK : <b>${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB</b><br/>` +
+            `• Waktu Selesai : <b>${timeStr} | ${dateStr}</b><br/>` +
+            `• Durasi Build : <b>${info.elapsedSec || 0} detik</b></p>` +
+            `</details>` +
+            `<blockquote>✅ <b>Kompilasi Sukses</b><br/>✅ <b>Siap Diinstall di Android</b></blockquote>` +
+            `<hr/>` +
+            `<p>• <b>BOT SHANZXGAMERS • BY @ShanzRL & @gamersbug</b></p>` +
+            `<tg-button-row>` +
+            `<tg-button type="url" style="primary" url="https://t.me/ZIP2APKBOT?start=start">🚀 Mau Build Juga? Gas Build!</tg-button>` +
+            `<tg-button type="url" style="success" url="https://t.me/ShanzRL">👑 DEVELOPER</tg-button>` +
+            `</tg-button-row>`;
 
-          notifyGroupLog(
-            buildAnnouncement,
-            createGroupBuildAnnouncementKeyboard()
-          );
+          notifyGroupRichLog(richBuildAnnouncement);
 
           if (artifact.fileSize <= 50 * 1024 * 1024) {
             await telegram.sendDocument(chatId, artifact.apkBuffer, artifact.fileName, caption, {
@@ -1056,28 +1082,32 @@ async function executeBuildGitHub(chatId, messageId, buildData) {
     const artifact = await github.downloadApkArtifact(completedRun.id);
 
     const { dateStr, timeStr } = getWibDateTime();
-    const buildAnnouncement = 
-      `<b>BUILD SHANZXGAMERS</b>\n` +
-      `<b>NOTIFICATION CENTER</b>\n\n` +
-      `• <b>BUILD SUCCESSFUL</b>\n` +
-      `<i>Aplikasi berhasil dikompilasi menjadi APK Android</i>\n\n` +
-      `• <b>STATUS SELESAI | File APK berhasil dibuat dan telah dikirim ke pengguna.</b>\n\n` +
-      `Aplikasi : <b>${appName}</b>\n` +
-      `File APK : <code>${artifact.fileName}</code>\n` +
-      `User ID : <code>${buildData.userId}</code>\n\n` +
-      `<b>Rincian Kompilasi</b>\n` +
-      `- Node Builder : <b>GitHub Actions Cloud</b>\n` +
-      `- Mode : <b>${buildMode.toUpperCase()}</b> (${type === 'flutter' ? 'Flutter' : 'WebView'})\n` +
-      `- Ukuran APK : <b>${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB</b>\n` +
-      `- Waktu Selesai : ${timeStr} | ${dateStr}\n\n` +
-      `✅ <b>Kompilasi Sukses</b>\n` +
-      `✅ <b>Siap Diinstall di Android</b>\n\n` +
-      `• <b>BOT SHANZXGAMERS • BY @ShanzRL & @gamersbug</b>`;
+    const richBuildAnnouncement = 
+      `<h1>BUILD SHANZXGAMERS</h1>` +
+      `<p><b>NOTIFICATION CENTER</b></p>` +
+      `<p>• <b>BUILD SUCCESSFUL</b><br/><i>Aplikasi berhasil dikompilasi menjadi APK Android</i></p>` +
+      `<blockquote>• <b>STATUS SELESAI</b> | File APK berhasil dibuat dan telah dikirim ke pengguna.</blockquote>` +
+      `<table bordered compact striped>` +
+      `<tr><th>Informasi</th><th>Rincian Aplikasi</th></tr>` +
+      `<tr><td>Aplikasi</td><td><b>${appName}</b></td></tr>` +
+      `<tr><td>File APK</td><td><code>${artifact.fileName}</code></td></tr>` +
+      `<tr><td>User ID</td><td><code>${buildData.userId}</code></td></tr>` +
+      `</table>` +
+      `<details open><summary><b>Rincian Kompilasi</b></summary>` +
+      `<p>• Node Builder : <b>GitHub Actions Cloud</b><br/>` +
+      `• Mode : <b>${buildMode.toUpperCase()} (${type === 'flutter' ? 'Flutter' : 'WebView'})</b><br/>` +
+      `• Ukuran APK : <b>${(artifact.fileSize / (1024 * 1024)).toFixed(2)} MB</b><br/>` +
+      `• Waktu Selesai : <b>${timeStr} | ${dateStr}</b></p>` +
+      `</details>` +
+      `<blockquote>✅ <b>Kompilasi Sukses</b><br/>✅ <b>Siap Diinstall di Android</b></blockquote>` +
+      `<hr/>` +
+      `<p>• <b>BOT SHANZXGAMERS • BY @ShanzRL & @gamersbug</b></p>` +
+      `<tg-button-row>` +
+      `<tg-button type="url" style="primary" url="https://t.me/ZIP2APKBOT?start=start">🚀 Mau Build Juga? Gas Build!</tg-button>` +
+      `<tg-button type="url" style="success" url="https://t.me/ShanzRL">👑 DEVELOPER</tg-button>` +
+      `</tg-button-row>`;
 
-    notifyGroupLog(
-      buildAnnouncement,
-      createGroupBuildAnnouncementKeyboard()
-    );
+    notifyGroupRichLog(richBuildAnnouncement);
 
     // Potong 1 credit hanya setelah build sukses terkirim
     const consumed = creditManager.consumeCredit(buildData.userId);
