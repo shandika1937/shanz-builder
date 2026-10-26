@@ -7,6 +7,7 @@ import {
   makeProgressBar,
   createStartKeyboard,
   createEngineSelectionKeyboard,
+  createBuildModeKeyboard,
   createJoinGroupKeyboard,
   createRemoveKeyboard,
   createCancelKeyboard,
@@ -185,23 +186,25 @@ async function sendCoOwnerInfo(chatId) {
 }
 
 async function sendZipModeInfo(chatId) {
-  const html = 
-    `<h1>📦 Mode Build ZIP to APK (Flutter)</h1>` +
-    `<p>Silakan kirimkan file <b>.zip</b> proyek Flutter kamu ke chat ini.</p>` +
-    `<details open>` +
-    `<summary><b>Syarat Berkas:</b></summary>` +
-    `<p>1. Memiliki file <code>pubspec.yaml</code></p>` +
-    `<p>2. Memiliki folder <code>lib/</code> dengan kode Dart</p>` +
-    `</details>`;
-  return telegram.sendRichMessage(chatId, html, { reply_markup: createStartKeyboard() });
+  const text = 
+    `📦 <b>KIRIM FILE PROYEK FLUTTER (ZIP)</b>\n\n` +
+    `Silakan kirimkan file <b>.zip</b> proyek Flutter kamu ke chat ini.\n\n` +
+    `<i>Pastikan di dalam ZIP terdapat <code>pubspec.yaml</code> dan folder <code>lib/</code>.</i>`;
+  return telegram.sendMessage(chatId, text, {
+    parse_mode: 'HTML',
+    reply_markup: createCancelKeyboard('wait')
+  });
 }
 
 async function sendHtmlModeInfo(chatId) {
-  const html = 
-    `<h1>🌐 Mode Build HTML to APK</h1>` +
-    `<p>Silakan kirim file <b>.html</b> kamu ke chat ini, atau tempelkan langsung kode HTML-nya di sini.</p>` +
-    `<p>Bot akan membungkus kode tersebut ke dalam template Android WebView modern!</p>`;
-  return telegram.sendRichMessage(chatId, html, { reply_markup: createStartKeyboard() });
+  const text = 
+    `🌐 <b>KIRIM FILE HTML WEBSITE</b>\n\n` +
+    `Silakan kirim file <b>.html</b> kamu ke chat ini, atau tempelkan langsung kode HTML-nya di sini.\n\n` +
+    `<i>File akan dikemas ke dalam template Android WebView.</i>`;
+  return telegram.sendMessage(chatId, text, {
+    parse_mode: 'HTML',
+    reply_markup: createCancelKeyboard('wait')
+  });
 }
 
 async function processUpdate(update) {
@@ -393,12 +396,14 @@ async function handleCallbackQuery(query) {
     return handleStart(telegram, chatId, query.from, userCredits);
   }
 
-  if (data === 'select_zip_engine') {
-    return sendEngineSelection(chatId, 'zip');
+  if (data === 'select_zip_engine' || data === 'mode_zip') {
+    userSessions.set(userId, { mode: 'zip' });
+    return sendZipModeInfo(chatId);
   }
 
-  if (data === 'select_html_engine') {
-    return sendEngineSelection(chatId, 'html');
+  if (data === 'select_html_engine' || data === 'mode_html') {
+    userSessions.set(userId, { mode: 'html' });
+    return sendHtmlModeInfo(chatId);
   }
 
   if (data === 'check_status_bot') {
@@ -429,38 +434,44 @@ async function handleCallbackQuery(query) {
     return sendWorkersStatus(chatId);
   }
 
-  if (data.startsWith('engine_vps_')) {
-    const fileType = data.replace('engine_vps_', '');
-    userSessions.set(userId, { mode: fileType, engine: 'vps' });
-    const vpsInfo = await vps.getStatus();
-    const queueNote = vpsInfo.queueLength > 0 ? `\n\n⏳ <i>Saat ini ada <b>${vpsInfo.queueLength} antrean</b> di worker ini.</i>` : '';
-    return telegram.sendRichMessage(
-      chatId,
-      `<h1>🖥️ Jalur VPS Worker 1 Dipilih!</h1>` +
-      `<p>Status Node: <b>${vpsInfo.status === 'online' ? '🟢 Online (Dedicated 16GB)' : '🔴 Offline'}</b>${queueNote}</p>` +
-      `<p>Silakan kirimkan berkas <b>${fileType === 'zip' ? '.zip Flutter' : '.html'}</b> kamu sekarang.</p>`,
-      { reply_markup: createStartKeyboard() }
-    );
+  if (data.startsWith('pick_vps_')) {
+    const buildId = data.replace('pick_vps_', '');
+    const buildData = getPendingBuild(buildId);
+    if (!buildData) {
+      return telegram.editMessageText(chatId, messageId, '⚠️ Sesi build telah kedaluwarsa. Silakan kirim file kembali.');
+    }
+    buildData.engine = 'vps';
+    savePendingBuild(buildId, buildData);
+
+    const html = 
+      `<h1>⚙️ Pilih Mode Kompilasi</h1>` +
+      `<p>• 📱 <b>App:</b> <b>${buildData.appName}</b></p>` +
+      `<p>• 🖥️ <b>Server:</b> <code>VPS Worker (16GB RAM)</code></p>` +
+      `<p><i>Silakan pilih mode build yang diinginkan:</i></p>`;
+
+    return telegram.editRichMessage(chatId, messageId, html, {
+      reply_markup: createBuildModeKeyboard(buildId)
+    });
   }
 
-  if (data.startsWith('engine_github_')) {
-    const fileType = data.replace('engine_github_', '');
-    userSessions.set(userId, { mode: fileType, engine: 'github' });
-    return telegram.sendRichMessage(
-      chatId,
-      `<h1>☁️ Jalur GitHub Actions Dipilih!</h1>` +
-      `<p>Status Node: <b>🟢 Online (Multi-Runner Cloud)</b></p>` +
-      `<p>Silakan kirimkan berkas <b>${fileType === 'zip' ? '.zip Flutter' : '.html'}</b> kamu sekarang.</p>`,
-      { reply_markup: createStartKeyboard() }
-    );
-  }
+  if (data.startsWith('pick_github_')) {
+    const buildId = data.replace('pick_github_', '');
+    const buildData = getPendingBuild(buildId);
+    if (!buildData) {
+      return telegram.editMessageText(chatId, messageId, '⚠️ Sesi build telah kedaluwarsa. Silakan kirim file kembali.');
+    }
+    buildData.engine = 'github';
+    savePendingBuild(buildId, buildData);
 
-  if (data === 'mode_zip') {
-    return sendEngineSelection(chatId, 'zip');
-  }
+    const html = 
+      `<h1>⚙️ Pilih Mode Kompilasi</h1>` +
+      `<p>• 📱 <b>App:</b> <b>${buildData.appName}</b></p>` +
+      `<p>• ☁️ <b>Server:</b> <code>GitHub Actions Cloud</code></p>` +
+      `<p><i>Silakan pilih mode build yang diinginkan:</i></p>`;
 
-  if (data === 'mode_html') {
-    return sendEngineSelection(chatId, 'html');
+    return telegram.editRichMessage(chatId, messageId, html, {
+      reply_markup: createBuildModeKeyboard(buildId)
+    });
   }
 
   if (data === 'check_credits') {
@@ -593,33 +604,26 @@ async function handleZipUpload(chatId, userId, doc, messageId) {
       );
     }
 
-    const userSession = userSessions.get(userId) || {};
-    const selectedEngine = userSession.engine || 'vps'; // Default to VPS jika belum memilih
-
     savePendingBuild(buildId, {
       buildId,
       type: 'flutter',
       userId,
-      engine: selectedEngine,
       appName: inspection.name,
       version: inspection.version,
       zipPath
     });
 
+    const vpsInfo = await vps.getStatus();
+    const vpsBadge = vpsInfo.status === 'online' ? '🟢' : '🔴';
+
     const confirmHtml = 
-      `<h1>📦 Proyek Flutter</h1>` +
+      `<h1>📦 Berkas Flutter Diterima</h1>` +
       `<p>• 🏷️ <b>App:</b> <b>${inspection.name}</b> (v${inspection.version})</p>` +
       `<p>• 📁 <b>Berkas:</b> ${inspection.totalFiles} • <b>Ukuran:</b> ${(fileSize / (1024 * 1024)).toFixed(1)} MB</p>` +
-      `<tg-button-row>` +
-      `<tg-button type="callback_data" style="success" data="build_release_${buildId}">🚀 Release APK</tg-button>` +
-      `<tg-button type="callback_data" style="primary" data="build_debug_${buildId}">⚡ Debug APK</tg-button>` +
-      `</tg-button-row>` +
-      `<tg-button-row>` +
-      `<tg-button type="callback_data" style="danger" data="cancel_${buildId}">❌ Batal</tg-button>` +
-      `</tg-button-row>`;
+      `<p><i>Pilih server worker untuk mengompilasi APK:</i></p>`;
 
     return telegram.editRichMessage(chatId, statusMsg.message_id, confirmHtml, {
-      reply_markup: createConfirmKeyboard(buildId)
+      reply_markup: createEngineSelectionKeyboard(buildId)
     });
   } catch (err) {
     deletePendingBuild(buildId);
@@ -684,31 +688,21 @@ async function handleHtmlUpload(chatId, userId, doc, messageId) {
     const projectZip = await packageHtmlToAndroidProject(htmlBuffer, { appName });
     fs.writeFileSync(zipPath, projectZip);
 
-    const userSession = userSessions.get(userId) || {};
-    const selectedEngine = userSession.engine || 'vps';
-
     savePendingBuild(buildId, {
       buildId,
       type: 'html',
       userId,
-      engine: selectedEngine,
       appName,
       zipPath
     });
 
     const confirmHtml = 
-      `<h1>🌐 Berkas HTML</h1>` +
+      `<h1>🌐 Berkas HTML Diterima</h1>` +
       `<p>• 🏷️ <b>App:</b> <b>${appName}</b> (Android WebView)</p>` +
-      `<tg-button-row>` +
-      `<tg-button type="callback_data" style="success" data="build_release_${buildId}">🚀 Release APK</tg-button>` +
-      `<tg-button type="callback_data" style="primary" data="build_debug_${buildId}">⚡ Debug APK</tg-button>` +
-      `</tg-button-row>` +
-      `<tg-button-row>` +
-      `<tg-button type="callback_data" style="danger" data="cancel_${buildId}">❌ Batal</tg-button>` +
-      `</tg-button-row>`;
+      `<p><i>Pilih server worker untuk mengompilasi APK:</i></p>`;
 
     return telegram.editRichMessage(chatId, statusMsg.message_id, confirmHtml, {
-      reply_markup: createConfirmKeyboard(buildId)
+      reply_markup: createEngineSelectionKeyboard(buildId)
     });
   } catch (err) {
     deletePendingBuild(buildId);
@@ -744,18 +738,12 @@ async function handleRawHtmlText(chatId, userId, htmlText) {
     });
 
     const confirmHtml = 
-      `<h1>🌐 Kode HTML</h1>` +
+      `<h1>🌐 Kode HTML Diterima</h1>` +
       `<p>• 🏷️ <b>App:</b> <b>${appName}</b> (Android WebView)</p>` +
-      `<tg-button-row>` +
-      `<tg-button type="callback_data" style="success" data="build_release_${buildId}">🚀 Release APK</tg-button>` +
-      `<tg-button type="callback_data" style="primary" data="build_debug_${buildId}">⚡ Debug APK</tg-button>` +
-      `</tg-button-row>` +
-      `<tg-button-row>` +
-      `<tg-button type="callback_data" style="danger" data="cancel_${buildId}">❌ Batal</tg-button>` +
-      `</tg-button-row>`;
+      `<p><i>Pilih server worker untuk mengompilasi APK:</i></p>`;
 
     return telegram.editRichMessage(chatId, statusMsg.message_id, confirmHtml, {
-      reply_markup: createConfirmKeyboard(buildId)
+      reply_markup: createEngineSelectionKeyboard(buildId)
     });
   } catch (err) {
     deletePendingBuild(buildId);

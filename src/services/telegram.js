@@ -59,26 +59,56 @@ export async function downloadLargeFile(apiId, apiHash, botToken, sessionStr, ch
   return client.downloadMedia(msgs[0].media, downloadOpts);
 }
 
-export function createEngineSelectionKeyboard(fileType) {
+export function createEngineSelectionKeyboard(buildId) {
   return {
     inline_keyboard: [
       [
         {
           text: '🖥️ VPS Worker (16GB RAM)',
-          callback_data: `engine_vps_${fileType}`,
+          callback_data: `pick_vps_${buildId}`,
           style: 'primary'
-        },
+        }
+      ],
+      [
         {
-          text: '☁️ GitHub Cloud',
-          callback_data: `engine_github_${fileType}`,
+          text: '☁️ GitHub Actions Cloud',
+          callback_data: `pick_github_${buildId}`,
           style: 'success'
         }
       ],
       [
         {
-          text: '📊 Status Worker',
-          callback_data: 'check_workers',
+          text: '❌ Batalkan',
+          callback_data: `cancel_${buildId}`,
+          style: 'danger'
+        }
+      ]
+    ]
+  };
+}
+
+export function createBuildModeKeyboard(buildId) {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: '🚀 Build Release APK',
+          callback_data: `build_release_${buildId}`,
+          style: 'success'
+        }
+      ],
+      [
+        {
+          text: '⚡ Build Debug APK',
+          callback_data: `build_debug_${buildId}`,
           style: 'primary'
+        }
+      ],
+      [
+        {
+          text: '❌ Batalkan',
+          callback_data: `cancel_${buildId}`,
+          style: 'danger'
         }
       ]
     ]
@@ -187,29 +217,7 @@ export function createCancelKeyboard(buildId) {
 }
 
 export function createConfirmKeyboard(buildId) {
-  return {
-    inline_keyboard: [
-      [
-        {
-          text: '🚀 Release',
-          callback_data: `build_release_${buildId}`,
-          style: 'success'
-        },
-        {
-          text: '⚡ Debug',
-          callback_data: `build_debug_${buildId}`,
-          style: 'primary'
-        }
-      ],
-      [
-        {
-          text: '❌ Batalkan',
-          callback_data: `cancel_${buildId}`,
-          style: 'danger'
-        }
-      ]
-    ]
-  };
+  return createBuildModeKeyboard(buildId);
 }
 
 export class TelegramClient {
